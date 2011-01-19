@@ -1,0 +1,250 @@
+/**                                                                                        
+ *                                                                                         
+ *  Copyright © 2010, 2011 Inadco, Inc. All rights reserved.                               
+ *                                                                                         
+ *     Licensed under the Apache License, Version 2.0 (the "License");                     
+ *     you may not use this file except in compliance with the License.                    
+ *     You may obtain a copy of the License at                                             
+ *                                                                                         
+ *         http://www.apache.org/licenses/LICENSE-2.0                                      
+ *                                                                                         
+ *     Unless required by applicable law or agreed to in writing, software                 
+ *     distributed under the License is distributed on an "AS IS" BASIS,                   
+ *     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.            
+ *     See the License for the specific language governing permissions and                 
+ *     limitations under the License.                                                      
+ *                                                                                         
+ *                                                                                         
+ */                                                                                        
+package com.inadco.ecoadapters.pig;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.Map;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.pig.ExecType;
+import org.apache.pig.LoadFunc;
+import org.apache.pig.backend.datastorage.DataStorage;
+import org.apache.pig.data.DataBag;
+import org.apache.pig.data.Tuple;
+import org.apache.pig.data.TupleFactory;
+import org.apache.pig.impl.io.BufferedPositionedInputStream;
+import org.apache.pig.impl.logicalLayer.FrontendException;
+import org.apache.pig.impl.logicalLayer.schema.Schema;
+
+import com.google.protobuf.DynamicMessage;
+import com.google.protobuf.Message;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.inadco.ecoadapters.EcoUtil;
+
+/**
+ * This is loosely based SequenceFileLoader that is provided with pig
+ * contributions. it extracts sequence file values (same way Hive does) and
+ * decodes them according to the schema supplied. of course we do protobuf parsing based on 
+ * dynamic message . <p> 
+ * 
+ * Use example: <p>
+ * 
+ * <pre>
+
+register protobuf-java-2.3.0.jar;
+register inadco-protolib-1.0-SNAPSHOT.jar;
+
+A = load '/data/inadco/var/log/IMPRESSION/*'
+using com.inadco.ecoadapters.pig.SequenceFileProtobufLoader(
+'com.inadco.logging.codegen.test.TestMessages$TestLogProto');
+
+ -- or alternatively:
+
+A = load '/data/inadco/var/log/IMPRESSION/*'
+using com.inadco.ecoadapters.pig.SequenceFileProtobufLoader(
+'hdfs://localhost:11010/data/inadco/protolib/testMessages.protodesc?msg=inadco.test.TestLogProto');
+
+ -- and then test it
+ 
+describe A;
+A: {LandingPageTitle: chararray,LandingPageKeyword: chararray,UniqueURL: chararray,IsDelete: boolean,IsNew: boolean,IsDirty: boolean,___ERROR___: chararray}
+
+
+ </pre>
+ * 
+ * 
+ **/
+
+public class SequenceFileProtobufLoader implements LoadFunc {
+
+	private static final Log LOG = LogFactory
+			.getLog(SequenceFileProtobufLoader.class);
+
+	private SequenceFile.Reader 	m_reader;
+	private long 					m_end;
+
+	protected TupleFactory 			m_tupleFactory = TupleFactory.getInstance();
+
+	private Descriptor 				m_msgDesc;
+	private Message.Builder			m_msgBuilder;
+	private Schema 					m_pigSchema;
+
+	private Writable				m_key;
+	private BytesWritable			m_value;
+
+	public SequenceFileProtobufLoader(String msgDescString) {
+
+		try {
+			if ( msgDescString.startsWith("hdfs://"))
+				m_msgDesc=EcoUtil.inferDescriptorFromFilesystem(msgDescString);
+			else m_msgDesc = EcoUtil.inferDescriptor(msgDescString);
+			m_msgBuilder = DynamicMessage.newBuilder(m_msgDesc);
+			m_pigSchema = PigUtil.generatePigSchemaFromProto(m_msgDesc);
+
+			if (LOG.isDebugEnabled())
+				LOG.debug(String.format("Loaded LoadFunc for message class:%s",
+						msgDescString));
+
+		} catch (Throwable thr) {
+			if (thr instanceof RuntimeException)
+				throw (RuntimeException) thr;
+			else
+				throw new RuntimeException(thr);
+		}
+	}
+
+	@Override
+	public void bindTo(String fileName, BufferedPositionedInputStream is,
+			long offset, long end) throws IOException {
+		inferReader(fileName);
+		if (offset != 0)
+			m_reader.sync(offset);
+
+		m_end = end;
+		if ( m_value==null ) m_value=new BytesWritable(new byte[1<<12]);
+		
+	}
+
+	@Override
+	public DataBag bytesToBag(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public String bytesToCharArray(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Double bytesToDouble(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Float bytesToFloat(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Integer bytesToInteger(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Long bytesToLong(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Map<String, Object> bytesToMap(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Tuple bytesToTuple(byte[] arg0) throws IOException {
+		throw new FrontendException("SequenceFileProtobufLoader does not expect to cast data.");	
+	}
+
+	@Override
+	public Schema determineSchema(String fileName, ExecType execType,
+			DataStorage storage) throws IOException {
+		return m_pigSchema;
+	}
+
+	@Override
+	public RequiredFieldResponse fieldsToRead(RequiredFieldList arg0)
+			throws FrontendException {
+		return new LoadFunc.RequiredFieldResponse(false);
+	}
+
+	@Override
+	public Tuple getNext() throws IOException {
+
+		long l_pos=m_reader.getPosition();
+		
+		// it would seem that this thing is broken with hadoop 0.20.2 
+		// and pig 0.6.0 in SequenceFileLoader for Pig. 
+		// My modification seems to work (more or less). 
+		if (m_reader != null && m_reader.next(m_key, m_value)) {
+			if ( l_pos >=m_end && m_reader.syncSeen() ) return null;
+
+			// unfortunately, it seems like we have to reallocate bytes 
+			// into a separate container every time since protobuf message parsing  
+			// doesn't seem to know when to stop and it doesn't take a hint either
+			// as a length
+			try { 
+				byte[] bytes=m_value.getBytes();
+				if ( bytes.length!= m_value.getLength()) bytes=Arrays.copyOf(bytes, m_value.getLength());
+				Message msg = m_msgBuilder.clone().mergeFrom(bytes).buildPartial();
+//				DynamicMessage dynMessage = DynamicMessage.parseFrom(m_msgDesc, bytes);
+	
+				// DEBUG 
+	//			System.out.println ( dynMessage.toString());
+				
+				return PigUtil.protoMessage2PigTuple(msg, m_msgDesc, m_tupleFactory );
+			} catch ( Throwable thr ) { 
+				reportError ( thr );
+			}
+		}
+//		System.out.printf ( "No more tuples - current position %d, end %d.\n",
+//				m_reader.getPosition(), m_end);
+		return null;
+	}
+
+	
+	private void inferReader(String fileName) throws IOException {
+		if (m_reader == null) {
+			Configuration conf = new Configuration();
+			Path path = new Path(fileName);
+			FileSystem fs = FileSystem.get(path.toUri(), conf);
+			m_reader = new SequenceFile.Reader(fs, path, conf);
+			m_key=(Writable)ReflectionUtils.newInstance(
+					m_reader.getKeyClass(), new Configuration());
+			
+		}
+	}
+	
+	private Tuple reportError ( Throwable thr ) { 
+		Tuple msgTuple = m_tupleFactory.newTuple();
+		int errInd= m_msgDesc.getFields().size();
+		for ( int i =0; i < errInd; i++ ) msgTuple.append(null);
+		
+		StringWriter stw = new StringWriter();
+		PrintWriter pw = new PrintWriter ( stw);
+		thr.printStackTrace(pw);
+		pw.close();
+		
+		msgTuple.append ( thr.getMessage()+"\n"+stw.toString());
+		
+		return msgTuple;
+		
+	}
+
+}
