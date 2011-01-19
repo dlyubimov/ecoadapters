@@ -1,0 +1,79 @@
+package com.inadco.ecoadapters.pig;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.SequenceFile.CompressionType;
+import org.apache.hadoop.io.compress.DefaultCodec;
+import org.apache.hadoop.io.compress.GzipCodec;
+import org.apache.pig.StoreFunc;
+import org.apache.pig.data.DataByteArray;
+import org.apache.pig.data.DataType;
+import org.apache.pig.data.Tuple;
+
+public class SequenceFileStorage implements StoreFunc {
+
+    private static final Log LOG = LogFactory
+    .getLog(SequenceFileStorage.class);
+
+    
+
+    private Writable                m_key = new Text();
+    private BytesWritable           m_value = new BytesWritable();
+    
+    private SequenceFile.Writer     m_writer;
+
+    public SequenceFileStorage() {
+        super();
+    }
+
+    @Override
+    public void bindTo(OutputStream os) throws IOException {
+        Configuration conf = new Configuration();
+        @SuppressWarnings("deprecation")
+        FSDataOutputStream fsdos=new FSDataOutputStream(os);
+        m_writer=SequenceFile.createWriter(
+                conf, fsdos, Text.class, BytesWritable.class, CompressionType.BLOCK,
+                new DefaultCodec());
+        
+
+    }
+
+    @Override
+    public void finish() throws IOException {
+        if ( m_writer != null ) 
+            try { 
+                m_writer.close();
+            }finally { 
+                m_writer=null;
+            }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Class getStorePreparationClass() throws IOException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void putNext(Tuple f) throws IOException {
+        if ( f.size()!= 1 ) 
+            throw new IOException ("wrong type of tuple attributes, expected exactly 1 while storing into sequence file");
+        if ( f.getType(0)!= DataType.BYTEARRAY)
+            throw new IOException ( "wrong type of the stored value, expected byte array while storing into sequence file");
+        DataByteArray dba = (DataByteArray) f.get(0);
+        m_value.set(dba.get(), 0, dba.size());
+        m_writer.append(m_key, m_value);
+
+    }
+
+}
