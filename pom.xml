@@ -23,6 +23,20 @@
     </repository>
   </repositories>
 
+  <distributionManagement>
+    <repository>
+      <id>inadco-releases</id>
+      <name>inadco-releases</name>
+      <url>http://your.release.repo/libs-releases-local</url>
+    </repository>
+    <snapshotRepository>
+      <id>inadco-snapshots</id>
+      <name>inadco-snapshots</name>
+      <url>http://your.snapshort.repo/inadco/libs-snapshots-local</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+
   <modules>
     <module>ecoadapters</module>
   </modules>
