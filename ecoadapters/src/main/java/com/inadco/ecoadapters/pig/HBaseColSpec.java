@@ -10,14 +10,15 @@ import com.google.protobuf.Message;
 import com.inadco.ecoadapters.EcoUtil;
 
 class HBaseColSpec {
-    
-    byte[][]        m_fams;
-    byte[][]        m_cols;
-    Descriptor[]    m_msgDesc;
-    Message.Builder[] m_msgBuilder;
-    Schema[]        m_pigSchema;
 
-    public HBaseColSpec(String colSpecStr) throws PigException {
+    byte[][] m_fams;
+    byte[][] m_cols;
+    Descriptor[] m_msgDesc;
+    Message.Builder[] m_msgBuilder;
+    Schema[] m_pigSchema;
+
+    public HBaseColSpec(String colSpecStr, boolean prepPigSchemas)
+            throws PigException {
         super();
         try {
             String[] colSpecs = colSpecStr.split("\\s");
@@ -26,7 +27,8 @@ class HBaseColSpec {
             m_cols = new byte[colSpecs.length][];
             m_msgDesc = new Descriptor[colSpecs.length];
             m_msgBuilder = new Message.Builder[colSpecs.length];
-            m_pigSchema = new Schema[colSpecs.length];
+            if (prepPigSchemas)
+                m_pigSchema = new Schema[colSpecs.length];
             for (int i = 0; i < colSpecs.length; i++) {
                 String colSpec = colSpecs[i];
                 int famPos = colSpec.indexOf(':');
@@ -57,8 +59,10 @@ class HBaseColSpec {
                                         msgDescString));
 
                     m_msgBuilder[i] = DynamicMessage.newBuilder(m_msgDesc[i]);
-                    m_pigSchema[i] = PigUtil
-                            .generatePigSchemaFromProto(m_msgDesc[i]);
+
+                    if (prepPigSchemas)
+                        m_pigSchema[i] = PigUtil
+                                .generatePigSchemaFromProto(m_msgDesc[i]);
 
                     // if (LOG.isDebugEnabled())
                     // LOG.debug(String.format("Loaded LoadFunc for message class:%s",

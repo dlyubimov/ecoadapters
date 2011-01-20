@@ -65,7 +65,7 @@ import com.inadco.ecoadapters.pig.PigUtil.Tuple2ProtoMap;
 public class SequenceFileProtobufStorage extends StoreFunc {
     private static final Log LOG = LogFactory.getLog(SequenceFileStorage.class);
 
-    private static final String SCHEMA_PROPERTY = "inadco.SequenceFileProtobufStorage.schema.";
+    private static final String SCHEMA_PROPERTY = "inadco.SequenceFileProtobufStorage.schema";
 
     private Text m_key = new Text();
     private BytesWritable m_value = new BytesWritable();
@@ -144,7 +144,7 @@ public class SequenceFileProtobufStorage extends StoreFunc {
         m_pigSchema = Schema.getPigSchema(s);
         UDFContext udfctx = UDFContext.getUDFContext();
         udfctx.getUDFProperties(SequenceFileProtobufStorage.class).setProperty(
-                SCHEMA_PROPERTY + m_msgDescString,
+                SCHEMA_PROPERTY,
                 PigUtil.stringifySchema(m_pigSchema));
 
         // just for the sake of validation, try to build map on front end before
@@ -160,7 +160,7 @@ public class SequenceFileProtobufStorage extends StoreFunc {
                 UDFContext udfctx = UDFContext.getUDFContext();
                 String schemaStr = udfctx.getUDFProperties(
                         SequenceFileProtobufStorage.class).getProperty(
-                        SCHEMA_PROPERTY + m_msgDescString);
+                        SCHEMA_PROPERTY);
 
                 if (schemaStr == null)
                     throw new PigException(

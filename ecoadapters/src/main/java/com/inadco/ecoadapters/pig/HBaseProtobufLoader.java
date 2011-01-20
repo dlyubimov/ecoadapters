@@ -106,7 +106,7 @@ import com.inadco.ecoadapters.EcoUtil;
  * <P>
  * 
  * <pre>
- * pig-schema = key *(column1_schema column1_timestamp)
+ * pig-schema = HKEY *(column1_schema column1_timestamp)
  * </pre>
  * 
  * For the example above the describe produces:<P>
@@ -114,7 +114,7 @@ import com.inadco.ecoadapters.EcoUtil;
  * <pre>
  * describe CR;
  *   
- *   CR: {key: bytearray,contextrating::rating_2: (vendorId: int,contextRegressor: (xi: ... ),ERROR___: chararray),contextrating::rating_2::timestamp: long}
+ *   CR: {HKEY: bytearray,contextrating::rating_2: (vendorId: int,contextRegressor: (xi: ... ),ERROR___: chararray),contextrating::rating_2::timestamp: long}
  * </pre><P>
  * 
  * As usual, ERROR___ is a pseudo column to contain stacktraces for
@@ -130,17 +130,11 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
 
     private HBaseColSpec m_colSpec;
     
-//    private byte[][] m_cols;
-//    private byte[][] m_fams;
+    private TupleFactory m_tupleFactory = TupleFactory.getInstance();
 
-    protected TupleFactory m_tupleFactory = TupleFactory.getInstance();
-//    protected Descriptor[] m_msgDesc;
-//    protected Message.Builder[] m_msgBuilder;
-//    protected Schema[] m_pigSchema;
-
-    protected Configuration m_conf = new Configuration();
-    protected RecordReader<ImmutableBytesWritable, Result> m_reader;
-    protected Scan m_scan;
+    private Configuration m_conf = new Configuration();
+    private RecordReader<ImmutableBytesWritable, Result> m_reader;
+    private Scan m_scan;
 
     /**
      * so we try to do simple parsing here . the column spec is the same as in
@@ -154,7 +148,7 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
     public HBaseProtobufLoader(String colSpecStr) throws PigException {
         super();
         try {
-            m_colSpec = new HBaseColSpec(colSpecStr);
+            m_colSpec = new HBaseColSpec(colSpecStr,true);
             m_scan = new Scan();
             
             for (int i = 0; i < m_colSpec.m_cols.length; i++)
@@ -179,7 +173,7 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
 
         Schema ps = new Schema();
 
-        ps.add(new FieldSchema("key", DataType.BYTEARRAY)); // hbase key
+        ps.add(new FieldSchema(HBaseProtobufStorage.HKEY_ALIAS, DataType.BYTEARRAY)); // hbase key
 
         for (int i = 0; i < m_colSpec.m_pigSchema.length; i++) {
             String colName = Bytes.toString(m_colSpec.m_fams[i]) + "::"
