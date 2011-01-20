@@ -37,16 +37,22 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.pig.PigException;
+import org.apache.pig.impl.logicalLayer.schema.Schema;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.DescriptorProtos.FileDescriptorProto;
 import com.google.protobuf.DescriptorProtos.FileDescriptorSet;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.Message;
+import com.inadco.ecoadapters.pig.PigUtil;
 
 /**
  * utils shared by hive and pig adapters, mainly protobuf-centric
@@ -268,5 +274,5 @@ public final class EcoUtil {
 		else if ( l1 < l2 ) return -1; 
 		else return 1; 
 	}
-
+	
 }
