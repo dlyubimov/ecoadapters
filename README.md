@@ -14,7 +14,7 @@ What it can do:
 Mainly, it enables projection of attributes, nesting of messages and mapping 
 repeated protobuf fields into correspondent structures in Pig and Hive scripts. 
 
-The motivation is very similar to elephant-bird. The distinguishing points are: 
+The motivation is very similar to elephant-bird. The main features are: 
 
 * ecoadapters do not use code generation. Instead, one may specify either generated 
 message class name or  an hdfs path to protobuf descriptor file generated 
