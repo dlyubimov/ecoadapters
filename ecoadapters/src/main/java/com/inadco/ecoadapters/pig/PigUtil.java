@@ -456,5 +456,56 @@ public class PigUtil {
         }
         
     }
+    
+    ///////////////////
+    // certain raw types conversion strategies for hbase. 
+    public static interface Pig2HBaseStrategy { 
+        byte[] toHbase(Object pigVal) throws IOException ;  
+    }
+    
+    public static class PigByteArray2HBaseConversion implements Pig2HBaseStrategy {
+
+        @Override
+        public byte[] toHbase(Object pigVal) {
+            DataByteArray dba=(DataByteArray)pigVal;
+            if (dba==null) return null;
+            return dba.get();
+        }
+    }
+    
+    public static class PigCharArray2HBaseConversion implements Pig2HBaseStrategy {
+
+        @Override
+        public byte[] toHbase(Object pigVal) throws IOException {
+            String s  = ( String)pigVal;
+            if ( s == null ) return null; 
+            return s.getBytes("utf-8");
+        }
+
+    }
+    
+    public static class PigTuple2HBaseConversion implements Pig2HBaseStrategy {
+
+        private Tuple2ProtoMap m_protoMap;
+        private Message.Builder m_builder;
+        
+        
+        public PigTuple2HBaseConversion(Tuple2ProtoMap protomap, Message.Builder builder) {
+            super();
+            m_protoMap=protomap;
+            m_builder = builder;
+        }
+
+        @Override
+        public byte[] toHbase(Object pigVal) throws IOException {
+            Tuple t = (Tuple) pigVal; 
+            if ( t==null ) return null; 
+            Message.Builder b;
+            PigUtil.pigTuple2ProtoMessage(t, m_protoMap, b=m_builder.clone(), 0, t.size());
+            return b.build().toByteArray();
+        }
+        
+        
+    }
 
 }

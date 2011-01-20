@@ -19,12 +19,12 @@
 package com.inadco.ecoadapters.pig;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.RecordWriter;
@@ -37,7 +37,6 @@ import org.apache.pig.impl.logicalLayer.schema.Schema;
 import org.apache.pig.impl.logicalLayer.schema.Schema.FieldSchema;
 import org.apache.pig.impl.util.UDFContext;
 
-import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.inadco.ecoadapters.pig.PigUtil.Tuple2ProtoMap;
 
 /**
@@ -45,6 +44,22 @@ import com.inadco.ecoadapters.pig.PigUtil.Tuple2ProtoMap;
  * See {@link HBaseProtobufLoader} and {@link SequenceFileProtobufStorage} to
  * get an idea what is happening here.
  * <P>
+ * 
+ * When we save pig output, we match each column in the hbase output specification 
+ * to the pig output field with the same name. If hbase output specification 
+ * specifies protobuf conversion, the pig output field is expected to be a pig tuple. 
+ * Otherwise, we support pig byte arrays (no conversion) or pig chararray type 
+ * (converting to byte array using utf-8 encoding).<P> 
+ * 
+ * We also expected pig field by name {@link #HKEY_ALIAS} to be used as hbase key. 
+ * The conversions available for that are the same as for non-protobuf columns, 
+ * namely, pig bytearray or pig chararray.<P>
+ * 
+ * Finally, it is prudent to note that if a mapped pig output contains null, we issue a 
+ * {@link Delete} (otherwise we do a normal {@link Put}). Thus, every output may result 
+ * in either {@link Put} or {@link Delete} or both.<P> 
+ * 
+ * It is fatal to return a null for the {@link #HKEY_ALIAS} pig field.
  * 
  * @author dmitriy
  * 
@@ -58,7 +73,9 @@ public class HBaseProtobufStorage extends StoreFunc {
     private Schema m_pigSchema;
     private int[] m_colPigSchemaIndices;
     private int   m_keyPigSchemaIndex;
-    private Tuple2ProtoMap[] m_protoMaps;
+    private PigUtil.Pig2HBaseStrategy[] m_colConvStrategies;
+    private PigUtil.Pig2HBaseStrategy m_keyConvStrategy;
+    private RecordWriter<NullWritable, Object> m_recordWriter;
 
     /**
      * 
@@ -80,15 +97,40 @@ public class HBaseProtobufStorage extends StoreFunc {
 
     }
 
+    @SuppressWarnings({"unchecked","rawtypes"})
     @Override
     public void prepareToWrite(RecordWriter rw) throws IOException {
-        // TODO Auto-generated method stub
-
+        m_recordWriter=rw;
     }
 
     @Override
     public void putNext(Tuple t) throws IOException {
-        // TODO Auto-generated method stub
+        Put put=null; 
+        Delete delete=null;
+        
+        byte[] key=m_keyConvStrategy.toHbase(t.get(m_keyPigSchemaIndex));
+        if ( key == null ) 
+            throw new IOException ( "null value for hbase key attribute encountered in the pig output.");
+
+        for ( int i = 0; i< m_colConvStrategies.length; i++  ) { 
+            byte[] colval=m_colConvStrategies[i].toHbase(t.get(m_colPigSchemaIndices[i]));
+            if ( colval != null ) { 
+                if ( put == null )  
+                    put = new Put(key);
+                put.add(m_colSpec.m_fams[i], m_colSpec.m_cols[i], colval);
+            } else { 
+                if ( delete==null ) 
+                    delete = new Delete(key);
+                delete.deleteColumn(m_colSpec.m_fams[i],m_colSpec.m_cols[i]);
+            }
+        }
+
+        try { 
+            if ( put != null ) m_recordWriter.write(NullWritable.get(), put);
+            if ( delete != null ) m_recordWriter.write(NullWritable.get(),delete);
+        } catch  ( InterruptedException exc ) { 
+            throw new IOException("interrupted",exc);
+        }
 
     }
 
@@ -153,7 +195,10 @@ public class HBaseProtobufStorage extends StoreFunc {
             
             // remap columns to schema positional indices 
             m_colPigSchemaIndices=new int[m_colSpec.m_cols.length];
-            m_protoMaps=new Tuple2ProtoMap[m_colSpec.m_cols.length];
+            
+            // m_protoMaps=new Tuple2ProtoMap[m_colSpec.m_cols.length];
+            m_colConvStrategies=new PigUtil.Pig2HBaseStrategy[m_colSpec.m_cols.length];
+            
             for ( int i = 0; i < m_colSpec.m_cols.length; i++ ) { 
                 String col=Bytes.toString(m_colSpec.m_cols[i]);
                 int pos =m_pigSchema.getPosition(col);
@@ -169,7 +214,23 @@ public class HBaseProtobufStorage extends StoreFunc {
                         throw new IOException (String.format(
                                 "Tuple is expected for pig output attribute %s.",
                                 col));
-                    m_protoMaps[i]=PigUtil.generatePigTuple2ProtoMap(fs.schema, m_colSpec.m_msgDesc[i]);
+                    Tuple2ProtoMap map=PigUtil.generatePigTuple2ProtoMap(fs.schema, m_colSpec.m_msgDesc[i]);
+                    m_colConvStrategies[i]=new PigUtil.PigTuple2HBaseConversion(map, m_colSpec.m_msgBuilder[i]);
+                    
+                } else { 
+                    switch ( m_pigSchema.getField(pos).type) { 
+                    case DataType.BYTEARRAY:
+                        m_colConvStrategies[i]=new PigUtil.PigByteArray2HBaseConversion();
+                        break;
+                    case DataType.CHARARRAY:
+                        m_colConvStrategies[i]=new PigUtil.PigCharArray2HBaseConversion();
+                        break;
+                    default:
+                        throw new IOException ( String.format (
+                                "Unexpected/unsupported pig type for pig output for column %s.", 
+                                col
+                                ));
+                    }
                 }
             }
             m_keyPigSchemaIndex=m_pigSchema.getPosition(HKEY_ALIAS);
@@ -178,6 +239,19 @@ public class HBaseProtobufStorage extends StoreFunc {
                         "Unable to find pig field by name %s which is expected to be output key.", 
                         HKEY_ALIAS
                         ));
+            switch ( m_pigSchema.getField(m_keyPigSchemaIndex).type) { 
+            case DataType.BYTEARRAY:
+                m_keyConvStrategy=new PigUtil.PigByteArray2HBaseConversion();
+                break;
+            case DataType.CHARARRAY:
+                m_keyConvStrategy=new PigUtil.PigCharArray2HBaseConversion();
+                break;
+            default:
+                throw new IOException ( String.format (
+                        "Unexpected/unsupported pig type for pig output field %s which is supposed to be the table key.", 
+                        HKEY_ALIAS
+                        ));
+            }
         } catch (IOException exc) {
             throw exc;
         } catch (Throwable t) {
