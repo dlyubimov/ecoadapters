@@ -45,7 +45,8 @@ import com.inadco.ecoadapters.EcoUtil;
 import com.inadco.ecoadapters.pig.PigUtil.Tuple2ProtoMap;
 
 /**
- * try to combine protobuf mapping & store steps .
+ * {@link StoreFunc} for converting pig output into protobuf messages and 
+ * saving them into sequence files.<P>
  * 
  * There's a potential problem if more than 1 function is used in the same MR
  * job (if pig handles that as multiple outputs) .
