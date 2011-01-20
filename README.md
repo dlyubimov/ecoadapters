@@ -49,6 +49,30 @@ packed same way as above (BytesWritable values).
 
 * WIP: writing pig output as protobuf messages into HBase. 
 
+#### example: reading protobuf messages from sequence files into pig script: 
+
+To give an idea what this stuff can do, here's an actually ran of 
+example reading protobufs from a sequence file into pig:
+
+     register protobuf-java-2.3.0.jar;
+     
+     A = load '/data/inadco/var/log/IMPRESSION/*'
+     using com.inadco.ecoadapters.pig.SequenceFileProtobufLoader(
+     'com.inadco.logging.codegen.test.TestMessages$TestLogProto');
+     
+      -- or alternatively:
+     
+     A = load '/data/inadco/var/log/IMPRESSION/*'
+     using com.inadco.ecoadapters.pig.SequenceFileProtobufLoader(
+     'hdfs://localhost:11010/data/inadco/protolib/testMessages.protodesc?msg=inadco.test.TestLogProto');
+     
+      -- and then test it
+      
+     describe A;
+     A: {LandingPageTitle: chararray,LandingPageKeyword: chararray,UniqueURL: chararray,IsDelete: boolean,IsNew: boolean,IsDirty: boolean,___ERROR___: chararray}
+ 
+
+   
 
 Dependencies
 -------------
@@ -61,5 +85,9 @@ Hive dependency is not directly available in well-known public repositories so
 i guess one would need to install Hive jars locally or remotely using maven artifact id 
  _org.apache.hive:hive-serde:0.5.0_. Or let me know of a public repository with hive 
 artifacts, i'll be happy to add it.
+
+License 
+------- 
+Apache 2.0
 
 
