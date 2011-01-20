@@ -1,4 +1,4 @@
-Ecoadapters.
+Ecoadapters
 ============
 
 What it is 
@@ -51,7 +51,7 @@ packed same way as above (BytesWritable values).
 
 #### example: reading protobuf messages from sequence files into pig script: 
 
-To give an idea what this stuff can do, here's an actually ran of 
+To give an idea what this stuff can do, here's an actually ran  
 example reading protobufs from a sequence file into pig:
 
      register protobuf-java-2.3.0.jar;
