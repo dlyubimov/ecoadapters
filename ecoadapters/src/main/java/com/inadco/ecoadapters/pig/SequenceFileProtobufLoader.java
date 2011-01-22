@@ -47,7 +47,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.inadco.ecoadapters.EcoUtil;
 
 /**
- * This is loosely based SequenceFileLoader that is provided with pig
+ * This is loosely based on SequenceFileLoader that is provided with pig
  * contributions. it extracts sequence file values (same way Hive does) and
  * decodes them according to the schema supplied. of course we do protobuf
  * parsing based on dynamic message .

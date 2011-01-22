@@ -108,6 +108,8 @@ public class HBaseProtobufStorage extends StoreFunc {
         Put put=null; 
         Delete delete=null;
         
+        if ( m_keyConvStrategy==null ) _init(); // lazy backend init
+        
         byte[] key=m_keyConvStrategy.toHbase(t.get(m_keyPigSchemaIndex));
         if ( key == null ) 
             throw new IOException ( "null value for hbase key attribute encountered in the pig output.");
