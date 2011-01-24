@@ -47,7 +47,7 @@ packed same way as above (BytesWritable values).
 
 * reading protobuf messages from HBase columns into Pig. 
 
-* WIP: writing pig output as protobuf messages into HBase. 
+* writing pig output as protobuf messages into HBase. (as of tag 'HBaseProtobufStorage-verified '). 
 
 #### example: reading protobuf messages from sequence files into pig script: 
 
