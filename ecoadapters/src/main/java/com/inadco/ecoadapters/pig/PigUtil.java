@@ -186,7 +186,10 @@ public class PigUtil {
                 } else { 
                     // try to tread as tuple with one attr 
                     Object pigValue=privatePigTupleSingletonToSimpleType(DataType.toTuple(src.get(i)));
-                    builder.setField ( protoFd, parseSimpleProtoType(protoFd, pigValue));
+                    if ( pigValue == null ) 
+                        builder.clearField(protoFd);
+                    else 
+                        builder.setField ( protoFd, parseSimpleProtoType(protoFd, pigValue));
                 }
                 break;
                 
