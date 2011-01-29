@@ -15,4 +15,4 @@ mvn org.apache.maven.plugins:maven-release-plugin:2.1:perform -Darguments="-Dalt
 git checkout $DEV_BRANCH && \
 git merge $REL_BRANCH-$REL_VERSION && \
 git push
-
+git push --tags
