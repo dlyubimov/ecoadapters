@@ -83,7 +83,7 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <!-- for tests, 3rd party protobuf serialization into json, xml -->
         <protobuf-java-format.version>1.1</protobuf-java-format.version>
         <hive.version>0.5.0</hive.version>
-        <pig.version>0.7.0+16</pig.version>
+        <pig.version>0.8.0</pig.version>
         <log4j.version>1.2.16</log4j.version>
         <spring.version>3.0.5.RELEASE</spring.version>
 
@@ -238,10 +238,18 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <artifactId>hive-serde</artifactId>
         <version>${hive.version}</version>
       </dependency>
+      
       <dependency>
         <groupId>org.apache.pig</groupId>
-        <artifactId>pig-core</artifactId>
+        <artifactId>pig</artifactId>
         <version>${pig.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pig</groupId>
+        <artifactId>pig</artifactId>
+        <version>${pig.version}</version>
+        <classifier>sources</classifier>
+        <scope>runtime</scope>
       </dependency>
 
       <!-- spring: we can also load stuff from spring resources -->

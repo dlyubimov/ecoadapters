@@ -38,16 +38,17 @@ Hive external table using Hive's SerDe.
 Serialization (i.e. storing back into a sequence file) is not supported. 
 Usually one can reprocess this into a native hive table or run ad-hoc analytical queries.
 
-#### Pig (0.7.0). 
+#### Pig (0.7.0, 0.8.0). 
 
 * reading protobuf messages packed as values from a SequenceFile(s) with protobuf messages 
 packed same way as above (BytesWritable values). 
-
 * writing Pig output into Sequence files with protobuf messages packed the same way as above.
-
 * reading protobuf messages from HBase columns into Pig. 
-
 * writing pig output as protobuf messages into HBase. (as of tag 'HBaseProtobufStorage-verified '). 
+* dev-0.x branch is compiled with pig 0.8.0 and tested. Release 0.2 is the last one compiled with pig 0.7.0 
+but I used compiled 0.2 jar with pig 0.8.0 too so compiled artifact should stay compatible with pig 0.8.0 and 
+0.7.0 until we hit some incompabitibilty between 0.7.0 and 0.8.0 trees at which point one looking for 0.7.0 compatible 
+artifact should probably should go back to ecoadapters-0.2. (releases are marked with tags). 
 
 #### example: reading protobuf messages from sequence files into pig script: 
 
