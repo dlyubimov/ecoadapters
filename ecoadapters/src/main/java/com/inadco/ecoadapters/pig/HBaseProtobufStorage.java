@@ -20,6 +20,8 @@ package com.inadco.ecoadapters.pig;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
@@ -76,6 +78,8 @@ public class HBaseProtobufStorage extends StoreFunc {
     private PigUtil.Pig2HBaseStrategy[] m_colConvStrategies;
     private PigUtil.Pig2HBaseStrategy m_keyConvStrategy;
     private RecordWriter<NullWritable, Object> m_recordWriter;
+    
+    private Configuration m_conf; 
 
     /**
      * 
@@ -93,6 +97,8 @@ public class HBaseProtobufStorage extends StoreFunc {
     @Override
     public OutputFormat getOutputFormat() throws IOException {
         TableOutputFormat tof = new TableOutputFormat<Object>();
+        if ( m_conf != null ) tof.setConf(m_conf);
+        
         return tof;
 
     }
@@ -170,12 +176,16 @@ public class HBaseProtobufStorage extends StoreFunc {
         // if (prop != null)
         // m_conf.set(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP, prop);
 
+        HBaseConfiguration.addHbaseResources(job.getConfiguration());
+        
         if (pos >= 0)
             job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE,
                     location.substring(pos + 1));
         else
             job.getConfiguration()
                     .set(TableOutputFormat.OUTPUT_TABLE, location);
+        
+        m_conf=job.getConfiguration();
 
     }
 
