@@ -99,34 +99,34 @@
     </dependency>
 
     <dependency>
-      <groupId>com.cloudera.hadoop</groupId>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-core</artifactId>
     </dependency>
 
     <!-- causes weird compilation problems. not sure why. -->
-    <dependency>
-      <groupId>com.cloudera.hadoop</groupId>
+    <!-- dependency>
+      <groupId>org.apache..hadoop</groupId>
       <artifactId>hadoop-core</artifactId>
       <classifier>sources</classifier>
       <scope>runtime</scope>
-    </dependency>
+    </dependency -->
 
     <dependency>
-      <groupId>com.cloudera.zookeeper</groupId>
+      <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <scope>compile</scope>
     </dependency>
 
     <dependency>
-      <groupId>com.cloudera.hbase</groupId>
+      <groupId>org.apache.hbase</groupId>
       <artifactId>hbase</artifactId>
     </dependency>
 
-    <dependency>
-      <groupId>com.cloudera.hbase</groupId>
+    <!--dependency>
+      <groupId>org.apache..hbase</groupId>
       <artifactId>hbase</artifactId>
       <classifier>sources</classifier>
-    </dependency>
+    </dependency -->
 
     <!-- pig -->
     <dependency>

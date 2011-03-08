@@ -75,10 +75,10 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       </activation>
 
       <properties>
-        <hadoop.version>0.20.2-737</hadoop.version>
+        <hadoop.version>0.20.2-CDH3B4</hadoop.version>
 
         <!--CDH3b3, preferred over stumbleupon's -->
-        <hbase.version>0.89.20100924-28</hbase.version>
+        <hbase.version>0.90.1-CDH3B4</hbase.version>
         <protobuf.version>2.3.0</protobuf.version>
         <!-- for tests, 3rd party protobuf serialization into json, xml -->
         <protobuf-java-format.version>1.1</protobuf-java-format.version>
@@ -183,12 +183,12 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       <!-- end commons -->
 
       <dependency>
-        <groupId>com.cloudera.hadoop</groupId>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-core</artifactId>
         <version>${hadoop.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.cloudera.hadoop</groupId>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-core</artifactId>
         <version>${hadoop.version}</version>
         <classifier>sources</classifier>
@@ -200,14 +200,14 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <version>${hbase.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.cloudera.hbase</groupId>
+        <groupId>org.apache.hbase</groupId>
         <artifactId>hbase</artifactId>
         <version>${hbase.version}</version>
         <classifier>sources</classifier>
       </dependency>
 
       <dependency>
-        <groupId>com.cloudera.hbase</groupId>
+        <groupId>org.apache.hbase</groupId>
         <artifactId>hbase</artifactId>
         <version>${hbase.version}</version>
         <type>pom</type>
