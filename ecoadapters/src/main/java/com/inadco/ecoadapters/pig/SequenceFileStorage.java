@@ -48,13 +48,13 @@ import org.apache.pig.data.Tuple;
 public class SequenceFileStorage extends StoreFunc {
 
     @SuppressWarnings("unused")
-    private static final Log LOG = LogFactory.getLog(SequenceFileStorage.class);
+    private static final Log                              LOG     = LogFactory.getLog(SequenceFileStorage.class);
 
-    private Text m_key = new Text();
-    private BytesWritable m_value = new BytesWritable();
+    private Text                                          m_key   = new Text();
+    private BytesWritable                                 m_value = new BytesWritable();
 
     private SequenceFileOutputFormat<Text, BytesWritable> m_outputFormat;
-    private RecordWriter<Text, BytesWritable> m_recordWriter;
+    private RecordWriter<Text, BytesWritable>             m_recordWriter;
 
     public SequenceFileStorage() {
         super();
@@ -78,10 +78,8 @@ public class SequenceFileStorage extends StoreFunc {
     public void setStoreLocation(String location, Job job) throws IOException {
         SequenceFileOutputFormat.setOutputPath(job, new Path(location));
         SequenceFileOutputFormat.setCompressOutput(job, true);
-        SequenceFileOutputFormat.setOutputCompressionType(job,
-                CompressionType.BLOCK);
-        SequenceFileOutputFormat.setOutputCompressorClass(job,
-                DefaultCodec.class);
+        SequenceFileOutputFormat.setOutputCompressionType(job, CompressionType.BLOCK);
+        SequenceFileOutputFormat.setOutputCompressorClass(job, DefaultCodec.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(BytesWritable.class);
     }
@@ -91,10 +89,10 @@ public class SequenceFileStorage extends StoreFunc {
         try {
             if (f.size() != 1)
                 throw new IOException(
-                        "wrong type of tuple attributes, expected exactly 1 while storing into sequence file");
+                    "wrong type of tuple attributes, expected exactly 1 while storing into sequence file");
             if (f.getType(0) != DataType.BYTEARRAY)
                 throw new IOException(
-                        "wrong type of the stored value, expected byte array while storing into sequence file");
+                    "wrong type of the stored value, expected byte array while storing into sequence file");
             DataByteArray dba = (DataByteArray) f.get(0);
             m_value.set(dba.get(), 0, dba.size());
             m_recordWriter.write(m_key, m_value);

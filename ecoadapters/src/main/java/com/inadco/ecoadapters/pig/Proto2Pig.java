@@ -15,7 +15,7 @@
  *     limitations under the License.                                                      
  *                                                                                         
  *                                                                                         
- */                                                                                        
+ */
 package com.inadco.ecoadapters.pig;
 
 import java.io.IOException;
@@ -32,49 +32,57 @@ import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
 import org.apache.pig.impl.logicalLayer.schema.Schema.FieldSchema;
 
+import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
-import com.google.protobuf.Descriptors.Descriptor;
 import com.inadco.ecoadapters.EcoUtil;
 
 /**
- * abstract base to evaluate a serialized protobuf message to pig 
+ * abstract base to evaluate a serialized protobuf message to pig
+ * <P>
  * 
- *  Usage: create a pig udf derived from this class and override 
- *  constructor that supplies the message descriptor.
- *  
- *  TODO: pass the schema from frontend to backend. 
- *  UNFORTUNATELY, this will not work if more than one function use per 
- *  MR job. There's currently no way in pig to overcome this for eval functions.(as of 0.7.0).
- *  
- *  CURRENT STATUS: DO NOT USE.
+ * Usage: create a pig udf derived from this class and override constructor that
+ * supplies the message descriptor.
+ * <P>
+ * 
+ * use
+ * 
+ * <pre>
+ *  define mymsg2Pig com.inadco.ecoadapters.pig.Proto2Pig(mymsg-class-or-uri)
+ * </pre>
+ * 
+ * as you would do with other loader functions (see, for example,
+ * {@link SequenceFileProtobufLoader} for description of this urls or
+ * classnames).
+ * <P>
+ * 
+ * Status: verification
  * 
  * @author dmitriy
- *
+ * 
  */
-public abstract class ProtoToPig extends EvalFunc<Tuple> {
-    
-    private static final Log LOG = LogFactory
-            .getLog(ProtoToPig.class);
-    
-    protected Descriptor                m_msgDesc;
-    protected DynamicMessage.Builder    m_msgBuilder;
-    protected Schema                    m_pigSchema;
-    protected TupleFactory              m_tupleFactory;
+public class Proto2Pig extends EvalFunc<Tuple> {
 
-    public ProtoToPig(String msgDescString) {
+    private static final Log         LOG = LogFactory.getLog(Proto2Pig.class);
+
+    protected Descriptor             m_msgDesc;
+    protected DynamicMessage.Builder m_msgBuilder;
+    protected Schema                 m_pigSchema;
+    protected TupleFactory           m_tupleFactory;
+
+    public Proto2Pig(String msgDescString) {
         super();
         try {
-            if ( msgDescString.startsWith("hdfs://"))
-                m_msgDesc=EcoUtil.inferDescriptorFromFilesystem(msgDescString);
-            else m_msgDesc = EcoUtil.inferDescriptorFromClassName(msgDescString);
+            if (msgDescString.startsWith("hdfs://"))
+                m_msgDesc = EcoUtil.inferDescriptorFromFilesystem(msgDescString);
+            else
+                m_msgDesc = EcoUtil.inferDescriptorFromClassName(msgDescString);
             m_msgBuilder = DynamicMessage.newBuilder(m_msgDesc);
             m_pigSchema = PigUtil.generatePigSchemaFromProto(m_msgDesc);
             m_tupleFactory = TupleFactory.getInstance();
 
             if (LOG.isDebugEnabled())
-                LOG.debug(String.format("Loaded LoadFunc for message class:%s",
-                        msgDescString));
+                LOG.debug(String.format("Loaded LoadFunc for message class:%s", msgDescString));
 
         } catch (Throwable thr) {
             if (thr instanceof RuntimeException)
@@ -86,32 +94,29 @@ public abstract class ProtoToPig extends EvalFunc<Tuple> {
 
     @Override
     public Tuple exec(Tuple tuple) throws IOException {
-        DataByteArray serMsg=(DataByteArray)tuple.get(0);
-        Message msg = m_msgBuilder.clone().mergeFrom(
-                serMsg.get(),0,serMsg.size()).buildPartial();
+        if (tuple == null)
+            return null;
+        DataByteArray serMsg = (DataByteArray) tuple.get(0);
+        Message msg = m_msgBuilder.clone().mergeFrom(serMsg.get(), 0, serMsg.size()).buildPartial();
         return PigUtil.protoMessage2PigTuple(msg, m_msgDesc, m_tupleFactory);
     }
-    
-    
 
     @Override
     public Type getReturnType() {
-        return Tuple.class; 
+        return Tuple.class;
     }
 
     @Override
     public Schema outputSchema(Schema input) {
-        
-        List<FieldSchema> fields=input.getFields();
-        if ( fields.size()!=1 ) 
-            throw new RuntimeException ( "Wrong # of arguments in call to ProtoToPig()");
+
+        List<FieldSchema> fields = input.getFields();
+        if (fields.size() != 1)
+            throw new RuntimeException("Wrong # of arguments in call to ProtoToPig()");
         FieldSchema argSchema = fields.get(0);
-        if ( argSchema.type != DataType.BYTEARRAY ) 
-            throw new RuntimeException ( "Wrong argument type in call to ProtoToPig(): expected bytearray.");
+        if (argSchema.type != DataType.BYTEARRAY)
+            throw new RuntimeException("Wrong argument type in call to ProtoToPig(): expected bytearray.");
 
         return m_pigSchema;
     }
-    
-    
 
 }
