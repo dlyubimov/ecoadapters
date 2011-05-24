@@ -75,7 +75,7 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       </activation>
 
       <properties>
-        <hadoop.version>0.20.2-CDH3B4</hadoop.version>
+        <hadoop.version>0.20.2-cdh3u0</hadoop.version>
 
         <!--CDH3b3, preferred over stumbleupon's -->
         <hbase.version>0.90.1-cdh3u0</hbase.version>
@@ -236,6 +236,12 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       <dependency>
         <groupId>org.apache.hive</groupId>
         <artifactId>hive-serde</artifactId>
+        <version>${hive.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hive</groupId>
+        <artifactId>hive-exec</artifactId>
         <version>${hive.version}</version>
       </dependency>
       
