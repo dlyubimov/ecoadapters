@@ -78,6 +78,7 @@ public class HBaseProtobufStorage extends StoreFunc {
     private PigUtil.Pig2HBaseStrategy[] m_colConvStrategies;
     private PigUtil.Pig2HBaseStrategy m_keyConvStrategy;
     private RecordWriter<NullWritable, Object> m_recordWriter;
+    private String m_instanceName;
     
     private Configuration m_conf; 
 
@@ -88,9 +89,14 @@ public class HBaseProtobufStorage extends StoreFunc {
      *            {@link HBaseProtobufLoader#HBaseProtobufLoader(String)}.
      */
 
-    public HBaseProtobufStorage(String colSpecString) throws PigException {
+    public HBaseProtobufStorage(String colSpecString, String instanceName) throws PigException {
         super();
         m_colSpec = new HBaseColSpec(colSpecString, false);
+        m_instanceName=instanceName;
+    }
+
+    public HBaseProtobufStorage(String colSpecString) throws PigException {
+        this(colSpecString,null);
     }
 
     @SuppressWarnings("rawtypes")
@@ -148,7 +154,7 @@ public class HBaseProtobufStorage extends StoreFunc {
 
         UDFContext udfctx = UDFContext.getUDFContext();
         udfctx.getUDFProperties(SequenceFileProtobufStorage.class).setProperty(
-                SCHEMA_PROPERTY, PigUtil.stringifySchema(m_pigSchema));
+                getSchemaPropName(), PigUtil.stringifySchema(m_pigSchema));
 
         for (int i = 0; i < m_colSpec.m_cols.length; i++) {
             String hbaseCol = Bytes.toString(m_colSpec.m_cols[i]);
@@ -189,6 +195,13 @@ public class HBaseProtobufStorage extends StoreFunc {
 
     }
 
+    private String getSchemaPropName() {
+        String r = SCHEMA_PROPERTY;
+        if ( m_instanceName != null ) 
+            r+="_"+m_instanceName;
+        return r;
+    }
+    
     private void _init() throws IOException {
         try {
             if (m_pigSchema == null) {
@@ -196,7 +209,7 @@ public class HBaseProtobufStorage extends StoreFunc {
                 UDFContext udfctx = UDFContext.getUDFContext();
                 String schemaStr = udfctx.getUDFProperties(
                         SequenceFileProtobufStorage.class).getProperty(
-                        SCHEMA_PROPERTY);
+                        getSchemaPropName());
 
                 if (schemaStr == null)
                     throw new PigException(
