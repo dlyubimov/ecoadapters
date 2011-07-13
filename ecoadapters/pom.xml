@@ -137,7 +137,7 @@
 
     <!-- hive -->
     <dependency>
-      <groupId>org.apache.hive</groupId>
+      <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-serde</artifactId>
       <optional>true</optional>
     </dependency>

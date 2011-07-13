@@ -234,13 +234,13 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hive</groupId>
+        <groupId>org.apache.hadoop.hive</groupId>
         <artifactId>hive-serde</artifactId>
         <version>${hive.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>org.apache.hive</groupId>
+        <groupId>org.apache.hadoop.hive</groupId>
         <artifactId>hive-exec</artifactId>
         <version>${hive.version}</version>
       </dependency>

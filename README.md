@@ -12,6 +12,7 @@ What it can do:
 * inline protobuf message parsing in Pig (obviously, very useful as lazy parsing technique 
 when optimizing for performance)
 * read hadoop sequence files with protobuf messags using hive
+* inline reading of an hbase value as bytes or protobuf message from hbase (HBaseGet)
 * misc 
 
 Mainly, it enables projection of attributes, nesting of messages and mapping 
@@ -33,7 +34,7 @@ following its progress.)
 Current capabilities we actively use:
 -------------------------------------
 
-#### Hive (0.5.0): 
+#### Hive (0.7.0): 
 
 Presenting a sequence file with protobuf messages as BytesWritable values as 
 Hive external table using Hive's SerDe.
@@ -140,19 +141,11 @@ Dependencies
 
 #### HBase, Hadoop, Pig
 
-HBase, Hadoop and Pig dependencies are now set to those in Cloudera release CDH3u0 at 
+HBase, Hadoop, Hive and Pig dependencies are now set to those in Cloudera release CDH3u0 at 
 the 0.3.2-SNAPSHOT. 0.3.1 was released and tagged and contained CDH3b4 dependencies. 
 
 We also verified these functions with standard apache releases, it's just what we currently use 
 those with. 
-
-#### Hive
-
-Hive dependency is not directly available in well-known public repositories so 
-i guess one would need to install Hive jars locally or remotely using maven artifact id 
- _org.apache.hive:hive-serde:<hive-version>_. Or let me know of a public repository with hive 
-artifacts, i'll be happy to add it.
-
 
 License 
 ------- 
