@@ -23,7 +23,7 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
 
   <groupId>com.inadco.ecoadapters</groupId>
   <artifactId>ecoadapters-parent</artifactId>
-  <version>0.3.9</version>
+  <version>0.3.10-SNAPSHOT</version>
   <name>Inadco :: Ecoadapters :: Parent </name>
 
   <packaging>pom</packaging>
