@@ -279,7 +279,7 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
         m_reader = reader;
     }
 
-    static String HBASE_ZK_CLIENTPORT_PROP = "hbase.zookeeper.clientport";
+    static String HBASE_ZK_CLIENTPORT_PROP = "hbase.zookeeper.property.clientPort";
     static String HBASE_ZK_QUORUM_PROP = "hbase.zookeeper.quorum";
 
     @Override
