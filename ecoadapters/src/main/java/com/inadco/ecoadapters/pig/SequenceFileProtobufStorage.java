@@ -116,7 +116,9 @@ public class SequenceFileProtobufStorage extends StoreFunc {
         SequenceFileOutputFormat.setOutputPath(job, new Path(location));
         SequenceFileOutputFormat.setCompressOutput(job, true);
         SequenceFileOutputFormat.setOutputCompressionType(job, CompressionType.BLOCK);
-        SequenceFileOutputFormat.setOutputCompressorClass(job, DefaultCodec.class);
+        // this now comes from default configuration property, no need to hardcode this, really. 
+        
+//        SequenceFileOutputFormat.setOutputCompressorClass(job, DefaultCodec.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(BytesWritable.class);
 
