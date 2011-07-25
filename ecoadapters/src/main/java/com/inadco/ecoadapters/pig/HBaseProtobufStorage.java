@@ -190,22 +190,25 @@ public class HBaseProtobufStorage extends StoreFunc {
 
         // extract some configuration properties but not all of them , if
         // possible.
-        // Configuration jc = job.getConfiguration();
-        // String prop = jc.get(HBaseProtobufLoader.HBASE_ZK_CLIENTPORT_PROP);
-        // if (prop != null)
-        // m_conf.set(HBaseProtobufLoader.HBASE_ZK_CLIENTPORT_PROP, prop);
-        // prop = jc.get(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP);
-        // if (prop != null)
-        // m_conf.set(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP, prop);
 
-        HBaseConfiguration.addHbaseResources(job.getConfiguration());
+        Configuration jc = job.getConfiguration();
+
+        String clientport = jc.get(HBaseProtobufLoader.HBASE_ZK_CLIENTPORT_PROP);
+        String quorum = jc.get(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP);
+
+        HBaseConfiguration.addHbaseResources(jc);
+
+        if (clientport != null)
+            jc.set(HBaseProtobufLoader.HBASE_ZK_CLIENTPORT_PROP, clientport);
+        if (quorum != null)
+            jc.set(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP, quorum);
 
         if (pos >= 0)
-            job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, location.substring(pos + 1));
+            jc.set(TableOutputFormat.OUTPUT_TABLE, location.substring(pos + 1));
         else
-            job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, location);
+            jc.set(TableOutputFormat.OUTPUT_TABLE, location);
 
-        m_conf = job.getConfiguration();
+        m_conf = jc;
 
     }
 

@@ -27,6 +27,7 @@ import java.util.NavigableMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -65,7 +66,9 @@ import com.inadco.ecoadapters.EcoUtil;
  * 
  * Argument to the load func is as follows (using bnf per RFC-822):
  * 
- * <b><PRE>
+ * <b>
+ * 
+ * <PRE>
  * 
  * col-specs = col-spec *(SPACE col-spec)   ; this is what you pass to the loader function
  * col-spec = col-family ":" col-name [":" protobuf-spec ]
@@ -73,15 +76,20 @@ import com.inadco.ecoadapters.EcoUtil;
  * protobuf-hdfs-spec = proto-desc-uri "?" "msg" "=" message-name
  * protobuf-msg-class-name = &lt;full java class name (with $ signs for inner classes) for the protobuf message to use to deserialize the cell value&gt;
  * proto-desc-uri = &lt;hdfs url pointing to protobuf descriptor file&gt;
- * </PRE></b>
+ * </PRE>
+ * 
+ * </b>
  * 
  * <P>
- *
- * As it follows from above, there are 2 ways to specify 
- * protobuf message used to store a cell. <P> 
  * 
- * One way is to specify generated class name with <code>protobuf-msg-class-name</code>.<P>
- *   
+ * As it follows from above, there are 2 ways to specify protobuf message used
+ * to store a cell.
+ * <P>
+ * 
+ * One way is to specify generated class name with
+ * <code>protobuf-msg-class-name</code>.
+ * <P>
+ * 
  * Alternatively, protobuf-spec may be specified by protobuf descriptor file as
  * produced by protobuf compiler (at this point, 2.3.0) using
  * --descriptor_set_out option and uploaded to hdfs location specified by
@@ -94,11 +102,16 @@ import com.inadco.ecoadapters.EcoUtil;
  * Example:
  * <P>
  * 
- * <B><pre>
+ * <B>
+ * 
+ * <pre>
  * CR = load 'CRAWLER_DATA' using 
  *      com.inadco.ecoadapters.pig.HBaseProtobufLoader(
  *     'contextrating:rating_2:$hdfs/data/inadco/protolib/inadco-logs.protodesc?msg=inadco.logs.ContentRating');
- * </pre></B><P>
+ * </pre>
+ * 
+ * </B>
+ * <P>
  * 
  * the schema contains tuple filled with key and columns schemas (optionally
  * expanded based on protobuf message if specified), followed by their
@@ -109,13 +122,15 @@ import com.inadco.ecoadapters.EcoUtil;
  * pig-schema = HKEY *(column1_schema column1_timestamp)
  * </pre>
  * 
- * For the example above the describe produces:<P>
+ * For the example above the describe produces:
+ * <P>
  * 
  * <pre>
  * describe CR;
  *   
  *   CR: {HKEY: bytearray,contextrating::rating_2: (vendorId: int,contextRegressor: (xi: ... ),ERROR___: chararray),contextrating::rating_2::timestamp: long}
- * </pre><P>
+ * </pre>
+ * <P>
  * 
  * As usual, ERROR___ is a pseudo column to contain stacktraces for
  * deserialization errors. (so one may count # of deserialization errors, for
@@ -126,15 +141,15 @@ import com.inadco.ecoadapters.EcoUtil;
  */
 public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
 
-    private static final Log LOG = LogFactory.getLog(HBaseProtobufLoader.class);
+    private static final Log                             LOG            = LogFactory.getLog(HBaseProtobufLoader.class);
 
-    private HBaseColSpec m_colSpec;
-    
-    private TupleFactory m_tupleFactory = TupleFactory.getInstance();
+    private HBaseColSpec                                 m_colSpec;
 
-    private Configuration m_conf = new Configuration();
+    private TupleFactory                                 m_tupleFactory = TupleFactory.getInstance();
+
+    private Configuration                                m_conf         = new Configuration();
     private RecordReader<ImmutableBytesWritable, Result> m_reader;
-    private Scan m_scan;
+    private Scan                                         m_scan;
 
     /**
      * so we try to do simple parsing here . the column spec is the same as in
@@ -148,9 +163,9 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
     public HBaseProtobufLoader(String colSpecStr) throws PigException {
         super();
         try {
-            m_colSpec = new HBaseColSpec(colSpecStr,true);
+            m_colSpec = new HBaseColSpec(colSpecStr, true);
             m_scan = new Scan();
-            
+
             for (int i = 0; i < m_colSpec.m_cols.length; i++)
                 m_scan.addColumn(m_colSpec.m_fams[i], m_colSpec.m_cols[i]);
 
@@ -168,16 +183,15 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
     }
 
     @Override
-    public ResourceSchema getSchema(String location, Job job)
-            throws IOException {
+    public ResourceSchema getSchema(String location, Job job) throws IOException {
 
         Schema ps = new Schema();
 
-        ps.add(new FieldSchema(HBaseProtobufStorage.HKEY_ALIAS, DataType.BYTEARRAY)); // hbase key
+        ps.add(new FieldSchema(HBaseProtobufStorage.HKEY_ALIAS, DataType.BYTEARRAY)); // hbase
+                                                                                      // key
 
         for (int i = 0; i < m_colSpec.m_pigSchema.length; i++) {
-            String colName = Bytes.toString(m_colSpec.m_fams[i]) + "::"
-                    + Bytes.toString(m_colSpec.m_cols[i]);
+            String colName = Bytes.toString(m_colSpec.m_fams[i]) + "::" + Bytes.toString(m_colSpec.m_cols[i]);
             if (m_colSpec.m_pigSchema[i] != null)
                 ps.add(new FieldSchema(colName, m_colSpec.m_pigSchema[i], DataType.TUPLE));
             else
@@ -191,8 +205,7 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
     }
 
     @Override
-    public ResourceStatistics getStatistics(String arg0, Job arg1)
-            throws IOException {
+    public ResourceStatistics getStatistics(String arg0, Job arg1) throws IOException {
         // TODO Auto-generated method stub
         return null;
     }
@@ -217,21 +230,17 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
             if (m_reader.nextKeyValue()) {
 
                 Tuple tuple = TupleFactory.getInstance().newTuple();
-                ImmutableBytesWritable key = (ImmutableBytesWritable) m_reader
-                        .getCurrentKey();
+                ImmutableBytesWritable key = (ImmutableBytesWritable) m_reader.getCurrentKey();
 
-                tuple.append(new DataByteArray(key.get(), key.getOffset(), key
-                        .getLength()));
+                tuple.append(new DataByteArray(key.get(), key.getOffset(), key.getLength()));
 
                 Result result = (Result) m_reader.getCurrentValue();
 
-                NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> resMap = result
-                        .getMap();
+                NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> resMap = result.getMap();
 
                 for (int i = 0; i < m_colSpec.m_cols.length; ++i) {
 
-                    NavigableMap<byte[], NavigableMap<Long, byte[]>> famMap = resMap
-                            .get(m_colSpec.m_fams[i]);
+                    NavigableMap<byte[], NavigableMap<Long, byte[]>> famMap = resMap.get(m_colSpec.m_fams[i]);
                     if (famMap == null) {
                         tuple.append(null);
                         tuple.append(null);
@@ -256,10 +265,8 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
                     if (m_colSpec.m_msgBuilder[i] == null)
                         tuple.append(new DataByteArray(val));
                     else {
-                        Message msg = m_colSpec.m_msgBuilder[i].clone().mergeFrom(val)
-                                .build();
-                        tuple.append(PigUtil.protoMessage2PigTuple(msg,
-                                m_colSpec.m_msgDesc[i], m_tupleFactory));
+                        Message msg = m_colSpec.m_msgBuilder[i].clone().mergeFrom(val).build();
+                        tuple.append(PigUtil.protoMessage2PigTuple(msg, m_colSpec.m_msgDesc[i], m_tupleFactory));
                     }
 
                     tuple.append(lastEntry.getKey()); // the version
@@ -274,13 +281,12 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
 
     @Override
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public void prepareToRead(RecordReader reader, PigSplit split)
-            throws IOException {
+    public void prepareToRead(RecordReader reader, PigSplit split) throws IOException {
         m_reader = reader;
     }
 
     static String HBASE_ZK_CLIENTPORT_PROP = "hbase.zookeeper.property.clientPort";
-    static String HBASE_ZK_QUORUM_PROP = "hbase.zookeeper.quorum";
+    static String HBASE_ZK_QUORUM_PROP     = "hbase.zookeeper.quorum";
 
     @Override
     public void setLocation(String location, Job job) throws IOException {
@@ -290,24 +296,29 @@ public class HBaseProtobufLoader extends LoadFunc implements LoadMetadata {
         // m_conf.set(TableInputFormat.INPUT_TABLE, location);
         // }
         int pos = location.lastIndexOf('/');
- 
+
         // extract some configuration properties but not all of them , if
         // possible.
         Configuration jc = job.getConfiguration();
-        String prop = jc.get(HBASE_ZK_CLIENTPORT_PROP);
-        if (prop != null)
-            m_conf.set(HBASE_ZK_CLIENTPORT_PROP, prop);
-        prop = jc.get(HBASE_ZK_QUORUM_PROP);
-        if (prop != null)
-            m_conf.set(HBASE_ZK_QUORUM_PROP, prop);
+
+        String clientport = jc.get(HBaseProtobufLoader.HBASE_ZK_CLIENTPORT_PROP);
+        String quorum = jc.get(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP);
+
+        HBaseConfiguration.addHbaseResources(jc);
+
+        if (clientport != null)
+            jc.set(HBaseProtobufLoader.HBASE_ZK_CLIENTPORT_PROP, clientport);
+        if (quorum != null)
+            jc.set(HBaseProtobufLoader.HBASE_ZK_QUORUM_PROP, quorum);
 
         if (pos >= 0)
-            m_conf.set(TableInputFormat.INPUT_TABLE,
-                    location.substring(pos + 1));
+            jc.set(TableInputFormat.INPUT_TABLE, location.substring(pos + 1));
         else
-            m_conf.set(TableInputFormat.INPUT_TABLE, location);
+            jc.set(TableInputFormat.INPUT_TABLE, location);
 
-        m_conf.set(TableInputFormat.SCAN, convertScanToString(m_scan));
+        jc.set(TableInputFormat.SCAN, convertScanToString(m_scan));
+
+        m_conf = jc;
     }
 
     private static String convertScanToString(Scan scan) {
