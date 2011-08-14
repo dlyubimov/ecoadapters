@@ -195,7 +195,7 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       </dependency>
 
       <dependency>
-        <groupId>com.cloudera.hbase</groupId>
+        <groupId>org.apache.hbase</groupId>
         <artifactId>hbase</artifactId>
         <version>${hbase.version}</version>
       </dependency>
