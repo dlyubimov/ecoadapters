@@ -147,6 +147,33 @@ the 0.3.2-SNAPSHOT. 0.3.1 was released and tagged and contained CDH3b4 dependenc
 We also verified these functions with standard apache releases, it's just what we currently use 
 those with. 
 
+Maven Repo
+----------
+Starting with release 0.3.12, i am also publishing release (and sometimes snapshot) artifacts. 
+Here's repo url to use : 
+
+   <repository>
+      <id>dlyubimov-maven-repo-releases</id>
+      <url>https://github.com/dlyubimov/dlyubimov-maven-repo/raw/master/releases</url>
+     <snapshots>    
+        <enabled>false</enabled>
+      </snapshots>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+    <repository>
+      <id>dlyubimov-maven-repo-snapshots</id>
+      <url>https://github.com/dlyubimov/dlyubimov-maven-repo/raw/master/snapshots</url>
+     <snapshots>    
+        <enabled>true</enabled>
+      </snapshots>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+    </repository>
+
+
 License 
 ------- 
 Apache 2.0
