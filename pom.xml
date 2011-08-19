@@ -29,9 +29,10 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
   <packaging>pom</packaging>
 
   <repositories>
+
     <repository>
       <id>cloudera</id>
-      <url>https://repository.cloudera.com/content/repositories/releases</url>
+      <url>https://repository.cloudera.com/artifactory/simple/libs-release</url>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
@@ -43,14 +44,14 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
 
   <distributionManagement>
     <repository>
-      <id>inadco-releases</id>
-      <name>inadco-releases</name>
-      <url>http://your.release.repo/libs-releases-local</url>
+      <id>dlyubimov-maven-repo-releases</id>
+      <name>releases</name>
+      <url>https://github.com/dlyubimov/dlyubimov-maven-repo/releases</url>
     </repository>
     <snapshotRepository>
-      <id>inadco-snapshots</id>
-      <name>inadco-snapshots</name>
-      <url>http://your.snapshort.repo/libs-snapshots-local</url>
+      <id>dlyubimov-maven-repo-snapshots</id>
+      <name>snapshots</name>
+      <url>https://github.com/dlyubimov/dlyubimov-maven-repo/snapshots</url>
     </snapshotRepository>
   </distributionManagement>
 

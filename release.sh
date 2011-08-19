@@ -6,6 +6,9 @@
 
 . ./branch.sh
 
+MVN_RELEASE_REPO=releases::default::file:../dlyubimov-maven-repo/releases
+MVN_SNAPSHOT_REPO=snapshots::default::file:../dlyubimov-maven-repo/snapshots
+
 git checkout $DEV_BRANCH && git pull $REMOTE && \
 git checkout -b $REL_BRANCH-$REL_VERSION && git push -u $REMOTE $REL_BRANCH-$REL_VERSION  && \
 mvn -e  release:clean org.apache.maven.plugins:maven-release-plugin:2.1:prepare -DlocalCheckout=true -DreleaseVersion=$REL_VERSION -Dtag=tag-$REL_VERSION \
