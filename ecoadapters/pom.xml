@@ -14,7 +14,7 @@
   <parent>
     <groupId>com.inadco.ecoadapters</groupId>
     <artifactId>ecoadapters-parent</artifactId>
-    <version>0.3.14</version>
+    <version>0.3.15-SNAPSHOT</version>
   </parent>
 
   <name>Inadco :: Ecoadapters </name>
