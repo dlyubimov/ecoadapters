@@ -76,15 +76,15 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
       </activation>
 
       <properties>
-        <hadoop.version>0.20.2-cdh3u0</hadoop.version>
+        <hadoop.version>0.20.2-cdh3u3</hadoop.version>
 
         <!--CDH3b3, preferred over stumbleupon's -->
-        <hbase.version>0.90.1-cdh3u0</hbase.version>
+        <hbase.version>0.90.4-cdh3u3</hbase.version>
         <protobuf.version>2.4.1</protobuf.version>
         <!-- for tests, 3rd party protobuf serialization into json, xml -->
         <protobuf-java-format.version>1.2</protobuf-java-format.version>
-        <hive.version>0.7.0-cdh3u0</hive.version>
-        <pig.version>0.8.0-cdh3u0</pig.version>
+        <hive.version>0.7.1-cdh3u3</hive.version>
+        <pig.version>0.8.1-cdh3u3</pig.version>
         <log4j.version>1.2.16</log4j.version>
         <spring.version>3.0.5.RELEASE</spring.version>
 
