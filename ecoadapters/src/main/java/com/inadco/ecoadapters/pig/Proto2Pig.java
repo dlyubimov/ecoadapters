@@ -65,21 +65,21 @@ public class Proto2Pig extends EvalFunc<Tuple> {
 
     private static final Log         LOG = LogFactory.getLog(Proto2Pig.class);
 
-    protected Descriptor             m_msgDesc;
-    protected DynamicMessage.Builder m_msgBuilder;
-    protected Schema                 m_pigSchema;
-    protected TupleFactory           m_tupleFactory;
+    protected Descriptor             msgDesc;
+    protected DynamicMessage.Builder msgBuilder;
+    protected Schema                 pigSchema;
+    protected TupleFactory           tupleFactory;
 
     public Proto2Pig(String msgDescString) {
         super();
         try {
             if (msgDescString.startsWith("hdfs://"))
-                m_msgDesc = EcoUtil.inferDescriptorFromFilesystem(msgDescString);
+                msgDesc = EcoUtil.inferDescriptorFromFilesystem(msgDescString);
             else
-                m_msgDesc = EcoUtil.inferDescriptorFromClassName(msgDescString);
-            m_msgBuilder = DynamicMessage.newBuilder(m_msgDesc);
-            m_pigSchema = PigUtil.generatePigSchemaFromProto(m_msgDesc);
-            m_tupleFactory = TupleFactory.getInstance();
+                msgDesc = EcoUtil.inferDescriptorFromClassName(msgDescString);
+            msgBuilder = DynamicMessage.newBuilder(msgDesc);
+            pigSchema = PigUtil.generatePigSchemaFromProto(msgDesc);
+            tupleFactory = TupleFactory.getInstance();
 
             if (LOG.isDebugEnabled())
                 LOG.debug(String.format("Loaded LoadFunc for message class:%s", msgDescString));
@@ -97,8 +97,8 @@ public class Proto2Pig extends EvalFunc<Tuple> {
         if (tuple == null)
             return null;
         DataByteArray serMsg = (DataByteArray) tuple.get(0);
-        Message msg = m_msgBuilder.clone().mergeFrom(serMsg.get(), 0, serMsg.size()).buildPartial();
-        return PigUtil.protoMessage2PigTuple(msg, m_msgDesc, m_tupleFactory);
+        Message msg = msgBuilder.clone().mergeFrom(serMsg.get(), 0, serMsg.size()).buildPartial();
+        return PigUtil.protoMessage2PigTuple(msg, msgDesc, tupleFactory);
     }
 
     @Override
@@ -116,7 +116,7 @@ public class Proto2Pig extends EvalFunc<Tuple> {
         if (argSchema.type != DataType.BYTEARRAY)
             throw new RuntimeException("Wrong argument type in call to ProtoToPig(): expected bytearray.");
 
-        return m_pigSchema;
+        return pigSchema;
     }
 
 }
