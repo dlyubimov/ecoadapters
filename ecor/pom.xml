@@ -26,10 +26,20 @@
 
     <profile>
       <id>R</id>
+      
+      <properties>
+        <rpkg-name>ecoR</rpkg-name>
+      </properties>
 
       <build>
 
         <plugins>
+
+          <plugin>
+            <artifactId>maven-assembly-plugin</artifactId>
+          </plugin>
+
+
           <plugin>
             <artifactId>maven-antrun-plugin</artifactId>
             <executions>
@@ -38,10 +48,11 @@
                 <phase>compile</phase>
                 <configuration>
                   <tasks>
-                    <exec executable="${basedir}/build/buildR.sh"
+                    <mkdir dir="${basedir}/target/generated-sources/R" />
+                    <exec executable="${basedir}/build/genDescription.sh"
                       failonerror="true" dir="${basedir}/build">
                       <!-- R pkg name -->
-                      <arg value="ecoR" />
+                      <arg value="${rpkg-name}" />
                       <!-- maven version -->
                       <arg value="${project.version}" />
                     </exec>
@@ -51,8 +62,38 @@
                   <goal>run</goal>
                 </goals>
               </execution>
+
+              <execution>
+                <id>r-package</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <tasks>
+                    <exec executable="R" failonerror="true"
+                      dir="${basedir}/target">
+                      <arg value="CMD" />
+                      <arg value="build" />
+                      <arg
+                        value="${basedir}/target/${project.artifactId}-${project.version}-rpkg" />
+                    </exec>
+                    <!-- rename to maven-sensible artifact name since we 
+                      want to upload it into mvn repo with "rpkg" classifier -->
+                    <move 
+                      tofile="${basedir}/target/${project.artifactId}-${project.version}-rpkg.tar.gz" >
+                      <fileset dir="${basedir}/target">
+                        <include name="${rpkg-name}_*tar.gz"/>
+                      </fileset>
+                    </move>
+
+                  </tasks>
+                </configuration>
+              </execution>
             </executions>
           </plugin>
+
+
 
           <plugin>
             <artifactId>build-helper-maven-plugin</artifactId>
@@ -68,7 +109,8 @@
                 <configuration>
                   <artifacts>
                     <artifact>
-                      <file>${basedir}/target/ecor-${project.version}-rpkg.tar.gz</file>
+                      <file>${basedir}/target/${project.artifactId}-${project.version}-rpkg.tar.gz
+                      </file>
                       <type>tar.gz</type>
                       <classifier>rpkg</classifier>
                     </artifact>

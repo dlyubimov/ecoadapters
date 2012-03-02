@@ -1,4 +1,4 @@
-# TODO: R wrapper for running hbl queries etc. using rJava
+# TODO: R wrapper for running ecor queries etc. using rJava
 # 
 # Author: dmitriy
 ###############################################################################
@@ -9,112 +9,60 @@ library("rJava");
 # generic initialization #
 ##########################
 
-# we assume that hadoop, hbase and HBL 
-# homes are required and PIG_HOME is 
-# optional (but if pig is not installed 
-# then compiler functions will not work
-# in this session).
-ecor.init <- function () {
+.onLoad <- function (libname,pkgname) .init(libname,pkgname, pkgInit=T)
+.onUnload <- function(libpath) rm(ecor) 
+
+.ecor.init <- function(libname = NULL, pkgname = NULL, pkgInit = F) {
+
+	hadoopcp <- .ecor.hadoopClassPath()
 	
-	hbl <- list()
-	hbl$options <- list()
-	hbl$consts <- list()
-	hbl$consts$HBASE_CONNECTION_PER_CONFIG <- "hbase.connection.per.config"
+	if ( pkgInit ) {
+		.jpackage(pkgname,morePaths=hadoopcp)
+	} else {
+		# DEBUG mode: package not installed.
+		# look files in a maven project tree 
+		# denoted by ECO_HOME
+		ecoHome <- Sys.getenv("ECO_HOME")
+		if ( nchar(ecoHome)==0 )
+			stop ("for initializing from maven tree, set ECO_HOME variable.")
+		
+		libdir <- paste ( ecoHome, "ecor/target","/")
+		libdir <- list.files(libdir, pattern= "^ecor-.*-rpkg$", full.names=T)
+		cp <- list.files(paste(libdir,"java","/"),pattern="\\.jar$",full.names=T)
+		.jinit(classpath=c(hadoopcp,cp))
+		
+	}
 	
-    hbl$options$HBL_HOME <- Sys.getenv("HBL_HOME");
-	hbl$options$HADOOP_HOME <- Sys.getenv("HADOOP_HOME");
-	hbl$options$HBASE_HOME <- Sys.getenv("HBASE_HOME");
-	hbl$options$PIG_HOME <- Sys.getenv("PIG_HOME");
+	ecor <- list()
+	ecor$conf <- new(J("org.apache.hadoop.conf.Configuration"))
+	ecor <<- ecor
+}
+
+.ecor.hadoopClassPath <- function () {
+	hhome <- Sys.getenv("HADOOP_HOME")
 	
-	if ( nchar(hbl$options$HADOOP_HOME) ==0 )
-		stop ("HADOOP_HOME not set");
+	if ( nchar(hhome) ==0 )
+		stop ("HADOOP_HOME not set")
 	
-	if ( nchar(hbl$options$HBL_HOME) == 0 ) 
-		stop("HBL_HOME not set");
-	
-	if ( nchar(hbl$options$HBASE_HOME)==0 ) 
-		stop("HBASE_HOME not set");
+	hlibdir <- paste (hhome, "lib", sep="/")
+	if ( ! file.exists(hlibdir))
+		stop ( sprintf("cannot find %s directory.", hlibdir))
 	
 	
-	
-	
-	cp1 <- list.files(
-			paste( hbl$options$HADOOP_HOME, "lib", sep="/" ), 
+	hadooplib <- list.files(
+			hlibdir,
 			full.names = T,
 			pattern="\\.jar$")
 	
-	core <- list.files (
-			hbl$options$HADOOP_HOME,
+	hadoopcore <- list.files (
+			hhome,
 			full.names=T,
 			pattern=".*core.*\\.jar"
-			)
+	)
 	
-	cp2 <- list.files (
-			paste(hbl$options$HBL_HOME, "lib", sep="/"),
-			full.names = T,
-			pattern="\\.jar$"
-			)
-		
-	cp3 <- character(0)
-	
-	for ( assemblyDir in list.files (
-			paste(hbl$options$HBL_HOME,"hbl/target",sep="/"),
-			full.names=T,
-			pattern="hbl-.*-dist$",
-			include.dirs=T
-			)) {  
-				
-		cp3 <- c(cp3, list.files(
-						paste(assemblyDir, "lib", sep="/"),
-						full.names=T,
-						pattern="\\.jar$"
-						))
-	}
-	
-	pigcp <- if ( length(hbl$PIG_HOME)>0 ) 
-		list.files(
-				paste(hbl$PIG_HOME,"lib",sep="/"),
-				full.names=T,
-				pattern = "\\.jar$"
-				)
-	
-	
-	hb_core <- list.files (
-			hbl$options$HBASE_HOME,
-			full.names=T,
-			pattern=".*hbase.*\\.jar")
-	
-	# TODO: pig classpath, too?
-	
-	hconf <- Sys.getenv("HADOOP_CONF")
-	
-	if (hconf == "")
-		hconf <- paste(hbl$options$HADOOP_HOME,"conf",sep="/")
-	
-	hbaseConf <- paste(hbl$options$HBASE_HOME,"conf",sep="/")
-	
-
-  	hbl$classpath <- c(cp1,cp2,cp3,core,hb_core, hconf,hbaseConf, pigcp)
-	
-	.jinit(classpath = hbl$classpath )	
-
-	hbl$conf <- new(J("org.apache.hadoop.conf.Configuration"))
-	hbl$conf <- J("org.apache.hadoop.hbase.HBaseConfiguration")$create(hbl$conf)
-	
-	# chd3u3 or later requred
-	hbl$conf$setBoolean(hbl$consts$HBASE_CONNECTION_PER_CONFIG,F)
-	
-	hbl$queryClient <- new(J("com.inadco.hbl.client.HblQueryClient"),hbl$conf)
-	
-	hbl <<- hbl
-	
+	c(hadooplib,hadoopcore)
 }
 
-.checkInit <- function() if ( !exists(hbl) ) hbl.init()
+.checkInit <- function() if ( !exists(ecor) ) ecor.init()
 
-.checkPig <- function() { 
-	.checkInit()
-	if ( length(hbl$PIG_HOME) == 0 )
-		stop("pig access is not initialized in this session (have you set PIG_HOME?)")
-}
 

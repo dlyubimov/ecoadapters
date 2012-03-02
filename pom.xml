@@ -144,6 +144,24 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
           </executions>
         </plugin>
 
+        <plugin>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>2.2.1</version>
+          <configuration>
+            <descriptors>
+              <descriptor>src/main/assembly/dist.xml</descriptor>
+            </descriptors>
+          </configuration>
+          <executions>
+            <execution>
+              <phase>package</phase>
+              <goals>
+                <goal>single</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+
       </plugins>
     </pluginManagement>
 
