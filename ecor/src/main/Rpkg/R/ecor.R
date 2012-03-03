@@ -14,10 +14,17 @@ library("rJava");
 
 .ecor.init <- function(libname = NULL, pkgname = NULL, pkgInit = F) {
 
+	require(rJava)
+	
+	ecor <- list()
+	
 	hadoopcp <- .ecor.hadoopClassPath()
 	
 	if ( pkgInit ) {
-		.jpackage(pkgname,morePaths=hadoopcp)
+		.jpackage(pkgname, morePaths = hadoopcp, lib.loc = libname)
+		cp <- list.files(system.file("java",package=pkgname,lib.loc=libname),
+				full.names=T, pattern ="\\.jar$")
+		ecor$cp <- cp
 	} else {
 		# DEBUG mode: package not installed.
 		# look files in a maven project tree 
@@ -31,10 +38,29 @@ library("rJava");
 		cp <- list.files(paste(libdir,"java","/"),pattern="\\.jar$",full.names=T)
 		.jinit(classpath=c(hadoopcp,cp))
 		
+		ecor$cp <- cp
+		
 	}
 	
-	ecor <- list()
-	ecor$conf <- new(J("org.apache.hadoop.conf.Configuration"))
+	ecor$jconf <- new(J("org.apache.hadoop.conf.Configuration"))
+
+	consts <- character(0)
+	# tight integration with some hadoop stuff to bypass the need 
+	# to have that stuff in classpath and actually do wrapper java calls.
+	
+	consts["INPUT_FORMAT"] <- "mapreduce.inputformat.class"
+	consts["OUTPUT_FORMAT"] <- "mapreduce.outputformat.class"
+  	consts["MAP"] <- "mapreduce.map.class"
+	consts["COMBINE" ] <- "mapreduce.combine.class"
+	consts["REDUCE" ] <- "mapreduce.reduce.class"
+	consts["PARTITION"] <- "mapreduce.partitioner.class"
+	consts["NAME"] <- "mapred.job.name"
+	consts["INPUT"] <- "mapred.input.dir"
+	consts["OUTPUT"] <- "mapred.output.dir"
+
+
+	ecor$consts <- consts
+	
 	ecor <<- ecor
 }
 
@@ -63,6 +89,145 @@ library("rJava");
 	c(hadooplib,hadoopcore)
 }
 
-.checkInit <- function() if ( !exists(ecor) ) ecor.init()
+.ecor.checkInit <- function() if ( !exists(ecor) ) ecor.init()
 
+##################################
+# generic MR job driver          #
+##################################
+
+# convert hadoop Configuration to a 
+# character vector with string subscripts 
+# corresponding to prop names 
+# Configuration is Iterable<Map.Entry<String,String>>
+.ecor.jconf2hconf <- function (jconf) {
+	conf <- ecor.hconf()
+	iter <- jconf$iterator()
+	while (iter$hasNext() ) {
+		map.entry <- iter$"next"()
+		conf[as.character(map.entry$getKey())] <- as.character(map.entry$getValue())
+	}
+	conf
+}
+
+# convert character vector to configuration
+.ecor.hconf2jconf <- function (v ) {
+	jconf <- new (J("org.apache.hadoop.conf.Configuration"),ecor$jconf)
+	sapply(names(v), function(n) jconf$set(n,v[n]))
+	jconf
+}
+
+# convert string to Path 
+.ecor.jpath <- function(parent, child=NULL) {
+	if ( child == NULL )
+		new ( J("org.apache.hadoop.fs.Path"),path)
+	else 
+		new ( J("org.apache.hadoop.fs.Path"),
+				.ecor.jpath(parent),child)
+}
+
+#local fs
+.ecor.localFS <- function () {
+	J("org.apache.hadoop.fs.FileSystem")$getLocal(ecor$jconf)
+}
+
+ecor.hconf <- function() { 
+	a <- character(0); class(a) <- "hconf";
+	
+	# set some defaults 
+	ecor.map(a) <- "com.inadco.ecoadapters.r.ProtoRMapper"
+	ecor.inputFormat(a) <- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
+	ecor.outputFormat(a) <- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+
+	a
+}
+
+.ecor.toB64 <- function(x) {
+	rawx <- serialize(x, NULL, ascii = F)
+	rawToChar(J("org.apache.commons.codec.binary.Base64")$encodeBase64(.jarray(rawx)))
+}
+.ecor.fromB64 <- function (x) {
+	rawx <- J("org.apache.commons.codec.binary.Base64")$decodeBase64(.jarray(charToRaw(x)))
+	rx <- unserialize(rawx)
+}
+
+ecor.hjob <- function(x,...) UseMethod("hjob")
+"ecor.inputFormat<-" <- function(x,...) UseMethod("inputFormat<-")
+ecor.inputFormat <- function(x,...) UseMethod("inputFormat")
+"ecor.outputFormat<-" <- function(x,...) UseMethod("outputFormat<-")
+ecor.outputFormat <- function(x,...) UseMethod("outputFormat")
+"ecor.map<-" <- function(x,...) UseMethod("map<-")
+ecor.map <- function(x,...) UseMethod("map")
+"ecor.reduce<-" <- function(x,...) UseMethod("reduce<-")
+ecor.reduce <- function(x,...) UseMethod("reduce")
+
+"inputFormat<-.hconf" <- function(x, value) { x[ecor$consts["INPUT_FORMAT"]] <- value; x} 
+inputFormat.hconf <- function (x) x[ecor$consts["INPUT_FORMAT"]]
+"outputFormat<-.hconf" <- function(x, value) { x[ecor$consts["OTUPUT_FORMAT"]] <- value; x}
+outputFormat.hconf <- function (x ) x[ecor$consts["OUTPUT_FORMAT"]]
+"map<-.hconf" <- function(x, value) { x[ecor$consts["MAP"]] <- value; x }
+map.hconf <- function(x) x[ecor$consts["MAP"]]
+"reduce<-.hconf" <- function(x, value ) { x[ecor$consts["REDUCE"]] <- value; x }
+reduce.hconf <- function (x) x[ecor$consts["REDUCE"]]
+
+
+"ecor.input<-" <- function (x,...) UseMethod("input<-")
+ecor.input <- function (x,...) UseMethod("input")
+"ecor.output<-" <- function (x,...) UseMethod("output<-")
+ecor.output <- function (x,...) UseMethod("output")
+
+"input<-.hconf" <- function (x, value) { x[ecor$consts["INPUT"]] <- value; x}
+input.hconf <- function (x) x[ecor$consts["INPUT"]]
+"output<-.hconf" <- function(x,value) { x[ecor$consts["OUTPUT"]] <- value; x}
+output.hconf <- function (x) x[ecor$consts["OUTPUT"]]
+
+#actually create job handle and submit
+hjob.hconf <- function(conf, MAPFUN ) {
+	
+	if ( class(MAPFUN) != "function" )
+		stop ("mapper R function expected.")
+
+	conf["ecor.MAPFUN"] <- .ecor.toB64(MAPFUN)
+	conf["ecor.NAMESPACES"] <- .ecor.toB64(loadedNamespaces())
+	
+	#serialize the environment into a file
+	
+	v <- sapply(ls(envir=.GlobalEnv),function(obn) .GlobalEnv[[obn]])
+	
+	envfname <- tempfile()
+	envf <- file(envfname)
+	
+	tryCatch({
+			serialize(v, envf, ascii = F)
+		},
+		finally = close(f)
+	)
+	
+	tryCatch ({
+			rm(v)
+			conf["ecor.envfile"] <- basename(envfname)
+			
+			jconf <- .ecor.vector2jconf(conf)
+			
+			J("org.apache.hadoop.filecache.DistributedCache")$
+					addCacheFile( new(J("java.net.URI"),basename(envfname)), jconf)
+			#pre-0.23 way of doing this 
+			sapply(ecor$cp, 
+					function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
+						addFileToClassPath(.ecor.jpath(f),jconf, .ecor.localFS()),
+					simplify=T)
+			
+			hjob <- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
+			hjob$submit() 
+
+		}, 
+		finally = file.remove(envfname)
+	)
+	
+}
+
+
+
+##################################
+# Generic mapper configuration   #
+##################################
 
