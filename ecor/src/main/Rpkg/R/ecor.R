@@ -23,7 +23,7 @@ library("rJava");
 # generic initialization #
 ##########################
 
-.onLoad <- function (libname,pkgname) .init(libname,pkgname, pkgInit=T)
+.onLoad <- function (libname,pkgname) .ecor.init(libname,pkgname, pkgInit=T)
 .onUnload <- function(libpath) rm(ecor) 
 
 .ecor.init <- function(libname = NULL, pkgname = NULL, pkgInit = F) {
