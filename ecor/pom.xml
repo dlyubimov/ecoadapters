@@ -26,7 +26,7 @@
 
     <profile>
       <id>R</id>
-      
+
       <properties>
         <rpkg-name>ecoR</rpkg-name>
       </properties>
@@ -80,10 +80,10 @@
                     </exec>
                     <!-- rename to maven-sensible artifact name since we 
                       want to upload it into mvn repo with "rpkg" classifier -->
-                    <move 
-                      tofile="${basedir}/target/${project.artifactId}-${project.version}-rpkg.tar.gz" >
+                    <move
+                      tofile="${basedir}/target/${project.artifactId}-${project.version}-rpkg.tar.gz">
                       <fileset dir="${basedir}/target">
-                        <include name="${rpkg-name}_*tar.gz"/>
+                        <include name="${rpkg-name}_*tar.gz" />
                       </fileset>
                     </move>
 
@@ -149,6 +149,10 @@
       <artifactId>ecoadapters</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>org.r-project</groupId>
+      <artifactId>jri</artifactId>
+    </dependency>
 
     <!-- test -->
     <dependency>

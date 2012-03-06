@@ -1,4 +1,18 @@
 # TODO: R wrapper for running ecor queries etc. using rJava
+#  
+# to enable running R on task nodes: 
+
+# * install R 
+# * install.packages("rJava")
+# * configure R_HOME variable in the mapred user env (or whichever user runs the tasks)
+#   on Ubuntu it is usually /usr/lib/R
+# * symbolic-link /lib64/libjri.so -> /usr/local/lib/R/site-library/rJava/jri/libjri.so
+#   (or otherwise make sure libjri.so is available thru java.library.path at the time 
+#    of MR task loading)
+#
+#   The following command should produce location dir of libjri.so:
+#
+#   R --vanilla <<< 'system.file("jri", package="rJava")'
 # 
 # Author: dmitriy
 ###############################################################################
@@ -208,9 +222,11 @@ hjob.hconf <- function(conf, MAPFUN ) {
 			
 			jconf <- .ecor.vector2jconf(conf)
 			
+			# broadcast tempfile containing environment
 			J("org.apache.hadoop.filecache.DistributedCache")$
 					addCacheFile( new(J("java.net.URI"),basename(envfname)), jconf)
-			#pre-0.23 way of doing this 
+					
+			# pre-0.23 way of doing this 
 			sapply(ecor$cp, 
 					function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
 						addFileToClassPath(.ecor.jpath(f),jconf, .ecor.localFS()),
@@ -231,3 +247,67 @@ hjob.hconf <- function(conf, MAPFUN ) {
 # Generic mapper configuration   #
 ##################################
 
+.ecor.collectbuff <- function () {
+	buff <- list()
+	buff$size <- 0
+	class(buff) <- "collectbuff"
+}
+
+# converts jobjRef to java.util.Map into R list
+.ecor.jmap2list <- function ( jmap ) { 
+	r <- list()
+	iterator <- jmap$iterator()
+	while (iterator$hasNext() ) {
+		entry <- iterator$'next'()
+		key <- as.character(entry$getKey())
+		# assuming rJava supported conversion only 
+		value <- entry$getValue()
+		r[[key]] <- value
+	}
+	r
+}
+
+.ecor.tasksetup <- function ( jconf ) {
+	
+	conf <- .ecor.jconf2hconf(jconf)
+	
+	# frontend packages translated to backend 
+	# to load here as well.
+	packages <- conf['ecor.NAMESPACES']
+	if ( packages == NULL ) 
+		stop ("no packages in the job configuration")
+	packages <- .ecor.fromB64(packages)
+	
+	require(packages)
+	
+	ecor$conf <<- conf
+	
+	# load environment if specified.
+	envfile <- conf['ecor.envfile']
+	if ( envfile != NULL ) { 
+		filePaths <- J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles()
+		cat (mode(filePaths), filePaths) 
+		stop ("debug")
+	} else {
+		warning("environment file not found in config.")
+	}
+	 
+	
+	collectbuff.keys <<- list()
+	collectbuff.values <<- list()
+	collectbuffsize <<- 0
+	
+}
+# to be called internally by protobuf mapper 
+.ecor.protomaptask <- function ( key, jmapvalue ) {
+	
+}
+
+
+ecor.collect <- function (key, value) {
+	 
+	collectbuff.keys[[ collectbuffsize ]] <- key
+	collectbuff.values[[ collectbuffsize ]] <- value
+	collectbuffsize <<- collectbuffsize + 1 
+	
+}

@@ -1,23 +1,14 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
-<!-- 
-
-Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-
- -->
+  <!-- Copyright © 2010, 2011 Inadco, Inc. All rights reserved. Licensed 
+    under the Apache License, Version 2.0 (the "License"); you may not use this 
+    file except in compliance with the License. You may obtain a copy of the 
+    License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by 
+    applicable law or agreed to in writing, software distributed under the License 
+    is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY 
+    KIND, either express or implied. See the License for the specific language 
+    governing permissions and limitations under the License. -->
 
   <modelVersion>4.0.0</modelVersion>
 
@@ -40,7 +31,22 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <enabled>true</enabled>
       </releases>
     </repository>
+
+    <!-- this is specifically for rJava R distribution jars only which are 
+      not currently pulished in maven public repos afaik. -->
+    <repository>
+      <id>dlyubimov-maven-repo-releases</id>
+      <url>https://github.com/dlyubimov/dlyubimov-maven-repo/raw/master/releases</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+
   </repositories>
+
 
   <distributionManagement>
     <repository>
@@ -98,6 +104,9 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <commons-math.version>1.2</commons-math.version>
         <commons-cli.version>1.2</commons-cli.version>
         <commons-httpclient.version>3.1</commons-httpclient.version>
+
+
+        <rJava-version>0.9-3</rJava-version>
 
       </properties>
     </profile>
@@ -302,7 +311,7 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <artifactId>hive-exec</artifactId>
         <version>${hive.version}</version>
       </dependency>
-      
+
       <dependency>
         <groupId>org.apache.pig</groupId>
         <artifactId>pig</artifactId>
@@ -329,6 +338,18 @@ Copyright © 2010, 2011 Inadco, Inc. All rights reserved.
         <classifier>sources</classifier>
       </dependency>
 
+      <!-- R stuff -->
+      <dependency>
+        <groupId>org.r-project</groupId>
+        <artifactId>jri</artifactId>
+        <version>${rJava-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.r-project</groupId>
+        <artifactId>jriengine</artifactId>
+        <version>${rJava-version}</version>
+      </dependency>
 
       <!-- test dependencies -->
       <dependency>
