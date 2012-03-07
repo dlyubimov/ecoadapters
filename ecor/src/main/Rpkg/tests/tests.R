@@ -7,7 +7,8 @@
 
 
 test1 <- function () {
-	
+	.ecor.init()
+  ecor.
   	
 }
 
