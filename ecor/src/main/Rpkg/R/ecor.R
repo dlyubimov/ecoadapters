@@ -17,7 +17,7 @@
 # Author: dmitriy
 ###############################################################################
 
-library("rJava");
+
 
 ##########################
 # generic initialization #
@@ -47,10 +47,11 @@ library("rJava");
 		if ( nchar(ecoHome)==0 )
 			stop ("for initializing from maven tree, set ECO_HOME variable.")
 		
-		libdir <- paste ( ecoHome, "ecor/target","/")
-		libdir <- list.files(libdir, pattern= "^ecor-.*-rpkg$", full.names=T)
-		cp <- list.files(paste(libdir,"java","/"),pattern="\\.jar$",full.names=T)
-		.jinit(classpath=c(hadoopcp,cp))
+		libdir <- paste ( ecoHome, "target",sep = "/")
+		pkgdir <- list.files(libdir, pattern= "^ecor-.*-rpkg$", full.names=T)
+		cp <- c ( list.files(paste(pkgdir,"java",sep="/"),pattern="\\.jar$",full.names=T),
+        paste(libdir,"test-classes",sep="/"))
+		.jinit(classpath = c(hadoopcp,cp))
 		
 		ecor$cp <- cp
 		
@@ -195,48 +196,67 @@ input.hconf <- function (x) x[ecor$consts["INPUT"]]
 output.hconf <- function (x) x[ecor$consts["OUTPUT"]]
 
 #actually create job handle and submit
-hjob.hconf <- function(conf, MAPFUN ) {
+hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	
 	if ( class(MAPFUN) != "function" )
 		stop ("mapper R function expected.")
 
-	conf["ecor.MAPFUN"] <- .ecor.toB64(MAPFUN)
+
 	conf["ecor.NAMESPACES"] <- .ecor.toB64(loadedNamespaces())
 	
-	#serialize the environment into a file
-	
-	v <- sapply(ls(envir=.GlobalEnv),function(obn) .GlobalEnv[[obn]])
-	
-	envfname <- tempfile()
-	envf <- file(envfname)
+	mapfunfilename <- tempfile()
+	f <- file(mapfunfilename)
 	
 	tryCatch({
-			serialize(v, envf, ascii = F)
+      # my tests seem to indicate 
+      # that this serializes all the function 
+      # environment too.
+			serialize(MAPFUN, f, ascii = F)
 		},
 		finally = close(f)
 	)
 	
 	tryCatch ({
-			rm(v)
-			conf["ecor.envfile"] <- basename(envfname)
+		conf["ecor.MAPFUN"] <- basename(mapfunfilename)
+    
+    reducefunfilename <- NULL 
+    if ( REDUCEFUN != NULL ) {
+      reducefunfilename <- tempfile()
+      f <- file(reducefunfilename)
+      tryCatch({
+            serialize(REDUCEFUN,f,ascii = F)
+          },
+          finally = {
+            close(f)
+          })
+      conf["ecor.REDUCEFUN"] <- basename(reducefunfilename)
+    }
 			
-			jconf <- .ecor.vector2jconf(conf)
+		jconf <- .ecor.vector2jconf(conf)
 			
-			# broadcast tempfile containing environment
-			J("org.apache.hadoop.filecache.DistributedCache")$
-					addCacheFile( new(J("java.net.URI"),basename(envfname)), jconf)
+		# broadcast tempfile containing environment
+		J("org.apache.hadoop.filecache.DistributedCache")$
+			addCacheFile( new(J("java.net.URI"),basename(mapfunfilename)), jconf)
 					
-			# pre-0.23 way of doing this 
-			sapply(ecor$cp, 
-					function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
-						addFileToClassPath(.ecor.jpath(f),jconf, .ecor.localFS()),
-					simplify=T)
+		# pre-0.23 way of doing this 
+		sapply(ecor$cp, 
+			function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
+				addFileToClassPath(.ecor.jpath(f),jconf, .ecor.localFS()),
+			simplify=T)
 			
 			hjob <- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
 			hjob$submit() 
+      
+      file.remove(mapfunfilename)
+      mapfunfilename <- NULL
+      file.remove(reducefunfilename)
+      reducefunfilename <- NULL
 
 		}, 
-		finally = file.remove(envfname)
+		finally = {
+      if (mapfunfilename != NULL )  file.remove(mapfunfilename)
+      if (reducefunfilename != NULL ) file.remove(reducefunfilename)
+    }
 	)
 	
 }
@@ -250,7 +270,10 @@ hjob.hconf <- function(conf, MAPFUN ) {
 .ecor.collectbuff <- function () {
 	buff <- list()
 	buff$size <- 0
+  buff$keys <- list()
+  buff$values <- list()
 	class(buff) <- "collectbuff"
+  buff
 }
 
 # converts jobjRef to java.util.Map into R list
@@ -267,7 +290,7 @@ hjob.hconf <- function(conf, MAPFUN ) {
 	r
 }
 
-.ecor.tasksetup <- function ( jconf ) {
+.ecor.tasksetup <- function ( jconf, mapsetup=T ) {
 	
 	conf <- .ecor.jconf2hconf(jconf)
 	
@@ -282,32 +305,64 @@ hjob.hconf <- function(conf, MAPFUN ) {
 	
 	ecor$conf <<- conf
 	
-	# load environment if specified.
-	envfile <- conf['ecor.envfile']
-	if ( envfile != NULL ) { 
-		filePaths <- J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles()
-		cat (mode(filePaths), filePaths) 
-		stop ("debug")
+  
+  filePaths <- as.list(J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles())
+  filePaths <- sapply(filePaths, function(x) x$toString() )
+  names(filePaths) <- sapply(filePaths, function(x) basename(x))
+  
+  if ( mapsetup ) {
+    mapfunfilename <- conf['ecor.MAPFUN']
+    mapfunfilepath <- filePaths[[mapfunfilename]]
+    if ( mapfunfilepath == NULL ) 
+      stop ("Unable to locate map function file path in the distributed cache files.")
+
+    MAPFUN <<- NULL
+    f <- file(mapfunfilepath)
+    tryCatch({
+          MAPFUN <<- unserialize(f)
+        },
+        finally = {
+          close(f)
+        })
+    
 	} else {
-		warning("environment file not found in config.")
+    # TODO: reduce task setup.
 	}
 	 
-	
-	collectbuff.keys <<- list()
-	collectbuff.values <<- list()
-	collectbuffsize <<- 0
-	
-}
-# to be called internally by protobuf mapper 
-.ecor.protomaptask <- function ( key, jmapvalue ) {
-	
+  collectbuff <<- ecor.collectbuff()
 }
 
+
+# to be called internally by protobuf mapper 
+.ecor.protomaptask <- function ( key, jmapvalue ) {
+	value <- ecor.jmap2list(jmapValue)
+  collectbuff <<- .ecor.collectbuff()
+  tryCatch({
+      MAPFUN(key,jmapvalue )
+      collectbuff
+    },
+    finally = { 
+      rm(collectbuff) 
+  })
+}
+
+.ecor.reducetask <- function ( key, valueVector ) {
+  values <- as.list(valueVector)
+  collectbuff <<- .ecor.collectbuff
+  tryCatch({
+        REDUCEFUN(key,jmapvalue )
+        collectbuff
+      },
+      finally = { 
+        rm(collectbuff) 
+      })
+}
 
 ecor.collect <- function (key, value) {
 	 
-	collectbuff.keys[[ collectbuffsize ]] <- key
-	collectbuff.values[[ collectbuffsize ]] <- value
-	collectbuffsize <<- collectbuffsize + 1 
-	
+	collectbuff$keys[[ collectbuffsize ]] <- key
+	collectbuff$values[[ collectbuffsize ]] <- value
+	collectbuff$size <<- collectbuffsize + 1 
+  
 }
+
