@@ -21,6 +21,17 @@ test1 <- function () {
   	
 }
 
+test2 <- function () {
+	d <- proto.desc('hdfs://localhost:11010/data/inadco/protolib/inadco-fas.protodesc?msg=inadco.logs.pipeline.FASClick')
+
+	rmsg <- list()
+	rmsg$clickId <- charToRaw('012345566')
+	rmsg$sessionId <- charToRaw('kdfklsdf')
+	rmsg$clickThru <- list()
+	
+	p <- proto.toProtoBldr( rmsg, d )
+}
+
 
 
 

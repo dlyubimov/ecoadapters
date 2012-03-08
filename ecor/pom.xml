@@ -28,7 +28,7 @@
       <id>R</id>
 
       <properties>
-        <rpkg-name>ecoR</rpkg-name>
+        <rpkg-name>ecor</rpkg-name>
       </properties>
 
       <build>
