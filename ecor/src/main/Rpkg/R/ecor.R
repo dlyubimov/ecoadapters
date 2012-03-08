@@ -27,7 +27,7 @@
 .onUnload <- function(libpath) rm(ecor) 
 
 .ecor.init <- function(libname = NULL, pkgname = NULL, pkgInit = F) {
-
+	
 	require(rJava)
 	
 	ecor <- list()
@@ -50,30 +50,34 @@
 		libdir <- paste ( ecoHome, "target",sep = "/")
 		pkgdir <- list.files(libdir, pattern= "^ecor-.*-rpkg$", full.names=T)
 		cp <- c ( list.files(paste(pkgdir,"java",sep="/"),pattern="\\.jar$",full.names=T),
-        paste(libdir,"test-classes",sep="/"))
+				paste(libdir,"test-classes",sep="/"))
 		.jinit(classpath = c(hadoopcp,cp))
 		
 		ecor$cp <- cp
 		
 	}
 	
+	# make sure all classpath entries exists, 
+	# it may cause problems later.
+	ecor$cp <- ecor$cp[file.exists(ecor$cp)]
+	
 	ecor$jconf <- new(J("org.apache.hadoop.conf.Configuration"))
-
+	
 	consts <- character(0)
 	# tight integration with some hadoop stuff to bypass the need 
 	# to have that stuff in classpath and actually do wrapper java calls.
 	
 	consts["INPUT_FORMAT"] <- "mapreduce.inputformat.class"
 	consts["OUTPUT_FORMAT"] <- "mapreduce.outputformat.class"
-  	consts["MAP"] <- "mapreduce.map.class"
+	consts["MAP"] <- "mapreduce.map.class"
 	consts["COMBINE" ] <- "mapreduce.combine.class"
 	consts["REDUCE" ] <- "mapreduce.reduce.class"
 	consts["PARTITION"] <- "mapreduce.partitioner.class"
 	consts["NAME"] <- "mapred.job.name"
 	consts["INPUT"] <- "mapred.input.dir"
 	consts["OUTPUT"] <- "mapred.output.dir"
-
-
+	
+	
 	ecor$consts <- consts
 	
 	ecor <<- ecor
@@ -132,9 +136,9 @@
 }
 
 # convert string to Path 
-.ecor.jpath <- function(parent, child=NULL) {
-	if ( child == NULL )
-		new ( J("org.apache.hadoop.fs.Path"),path)
+.ecor.jpath <- function(parent, child = NULL) {
+	if ( length(child) == 0 )
+		new ( J("org.apache.hadoop.fs.Path"), parent )
 	else 
 		new ( J("org.apache.hadoop.fs.Path"),
 				.ecor.jpath(parent),child)
@@ -152,7 +156,7 @@ ecor.hconf <- function() {
 	ecor.map(a) <- "com.inadco.ecoadapters.r.ProtoRMapper"
 	ecor.inputFormat(a) <- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
 	ecor.outputFormat(a) <- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-
+	
 	a
 }
 
@@ -200,63 +204,62 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	
 	if ( class(MAPFUN) != "function" )
 		stop ("mapper R function expected.")
-
-
+	
+	
 	conf["ecor.NAMESPACES"] <- .ecor.toB64(loadedNamespaces())
 	
 	mapfunfilename <- tempfile()
-	f <- file(mapfunfilename)
-	
+	f <- file(mapfunfilename, open="wb")
 	tryCatch({
-      # my tests seem to indicate 
-      # that this serializes all the function 
-      # environment too.
-			serialize(MAPFUN, f, ascii = F)
-		},
-		finally = close(f)
+				# my tests seem to indicate 
+				# that this serializes all the function 
+				# environment too.
+				serialize(MAPFUN, f, ascii = F)
+			},
+			finally = close(f)
 	)
 	
 	tryCatch ({
-		conf["ecor.MAPFUN"] <- basename(mapfunfilename)
-    
-    reducefunfilename <- NULL 
-    if ( REDUCEFUN != NULL ) {
-      reducefunfilename <- tempfile()
-      f <- file(reducefunfilename)
-      tryCatch({
-            serialize(REDUCEFUN,f,ascii = F)
-          },
-          finally = {
-            close(f)
-          })
-      conf["ecor.REDUCEFUN"] <- basename(reducefunfilename)
-    }
-			
-		jconf <- .ecor.vector2jconf(conf)
-			
-		# broadcast tempfile containing environment
-		J("org.apache.hadoop.filecache.DistributedCache")$
-			addCacheFile( new(J("java.net.URI"),basename(mapfunfilename)), jconf)
-					
-		# pre-0.23 way of doing this 
-		sapply(ecor$cp, 
-			function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
-				addFileToClassPath(.ecor.jpath(f),jconf, .ecor.localFS()),
-			simplify=T)
-			
-			hjob <- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
-			hjob$submit() 
-      
-      file.remove(mapfunfilename)
-      mapfunfilename <- NULL
-      file.remove(reducefunfilename)
-      reducefunfilename <- NULL
-
-		}, 
-		finally = {
-      if (mapfunfilename != NULL )  file.remove(mapfunfilename)
-      if (reducefunfilename != NULL ) file.remove(reducefunfilename)
-    }
+				conf["ecor.MAPFUN"] <- basename(mapfunfilename)
+				
+				reducefunfilename <- NULL 
+				if ( length(REDUCEFUN) >0  ) {
+					reducefunfilename <- tempfile()
+					f <- file(reducefunfilename, open="wb")
+					tryCatch({
+								serialize(REDUCEFUN,f,ascii = F)
+							},
+							finally = {
+								close(f)
+							})
+					conf["ecor.REDUCEFUN"] <- basename(reducefunfilename)
+				}
+				
+				jconf <- .ecor.hconf2jconf(conf)
+				
+				# broadcast tempfile containing environment
+				J("org.apache.hadoop.filecache.DistributedCache")$
+				addCacheFile( new(J("java.net.URI"),mapfunfilename), jconf)
+				
+				# pre-0.23 way of doing this 
+				sapply(ecor$cp[!file.info(ecor$cp)[,"isdir"]], 
+						function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
+							addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localFS()),
+						simplify=T)
+				
+				hjob <- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
+				hjob$submit() 
+				
+				file.remove(mapfunfilename)
+				mapfunfilename <- NULL
+				file.remove(reducefunfilename)
+				reducefunfilename <- NULL
+				
+			}, 
+			finally = {
+				if ( length(mapfunfilename) > 0 )  file.remove(mapfunfilename)
+				if ( length(reducefunfilename) > 0 ) file.remove(reducefunfilename)
+			}
 	)
 	
 }
@@ -270,22 +273,26 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 .ecor.collectbuff <- function () {
 	buff <- list()
 	buff$size <- 0
-  buff$keys <- list()
-  buff$values <- list()
+	buff$keys <- list()
+	buff$values <- list()
 	class(buff) <- "collectbuff"
-  buff
+	buff
 }
 
 # converts jobjRef to java.util.Map into R list
 .ecor.jmap2list <- function ( jmap ) { 
+	
 	r <- list()
+	
 	iterator <- jmap$iterator()
+	
 	while (iterator$hasNext() ) {
 		entry <- iterator$'next'()
 		key <- as.character(entry$getKey())
 		# assuming rJava supported conversion only 
 		value <- entry$getValue()
 		r[[key]] <- value
+		
 	}
 	r
 }
@@ -299,70 +306,73 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	packages <- conf['ecor.NAMESPACES']
 	if ( packages == NULL ) 
 		stop ("no packages in the job configuration")
+	
 	packages <- .ecor.fromB64(packages)
+	
 	
 	require(packages)
 	
+	
 	ecor$conf <<- conf
 	
-  
-  filePaths <- as.list(J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles())
-  filePaths <- sapply(filePaths, function(x) x$toString() )
-  names(filePaths) <- sapply(filePaths, function(x) basename(x))
-  
-  if ( mapsetup ) {
-    mapfunfilename <- conf['ecor.MAPFUN']
-    mapfunfilepath <- filePaths[[mapfunfilename]]
-    if ( mapfunfilepath == NULL ) 
-      stop ("Unable to locate map function file path in the distributed cache files.")
-
-    MAPFUN <<- NULL
-    f <- file(mapfunfilepath)
-    tryCatch({
-          MAPFUN <<- unserialize(f)
-        },
-        finally = {
-          close(f)
-        })
-    
+	
+	filePaths <- as.list(J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles())
+	filePaths <- sapply(filePaths, function(x) x$toString() )
+	names(filePaths) <- sapply(filePaths, function(x) basename(x))
+	
+	if ( mapsetup ) {
+		mapfunfilename <- conf['ecor.MAPFUN']
+		mapfunfilepath <- filePaths[[mapfunfilename]]
+		if ( mapfunfilepath == NULL ) 
+			stop ("Unable to locate map function file path in the distributed cache files.")
+		
+		MAPFUN <<- NULL
+		f <- file(mapfunfilepath, "rb")
+		tryCatch({
+					MAPFUN <<- unserialize(f)
+				},
+				finally = {
+					close(f)
+				})
+		
 	} else {
-    # TODO: reduce task setup.
+		# TODO: reduce task setup.
 	}
-	 
-  collectbuff <<- ecor.collectbuff()
+	
+	collectbuff <<- ecor.collectbuff()
 }
 
 
 # to be called internally by protobuf mapper 
 .ecor.protomaptask <- function ( key, jmapvalue ) {
 	value <- ecor.jmap2list(jmapValue)
-  collectbuff <<- .ecor.collectbuff()
-  tryCatch({
-      MAPFUN(key,jmapvalue )
-      collectbuff
-    },
-    finally = { 
-      rm(collectbuff) 
-  })
+	collectbuff <<- .ecor.collectbuff()
+	tryCatch({
+				MAPFUN(key,jmapvalue )
+				collectbuff
+			},
+			finally = { 
+				rm(collectbuff) 
+			})
 }
 
 .ecor.reducetask <- function ( key, valueVector ) {
-  values <- as.list(valueVector)
-  collectbuff <<- .ecor.collectbuff
-  tryCatch({
-        REDUCEFUN(key,jmapvalue )
-        collectbuff
-      },
-      finally = { 
-        rm(collectbuff) 
-      })
+	values <- as.list(valueVector)
+	collectbuff <<- .ecor.collectbuff
+	tryCatch({
+				REDUCEFUN(key,jmapvalue )
+				collectbuff
+			},
+			finally = { 
+				rm(collectbuff) 
+			})
 }
 
 ecor.collect <- function (key, value) {
-	 
+	
 	collectbuff$keys[[ collectbuffsize ]] <- key
 	collectbuff$values[[ collectbuffsize ]] <- value
 	collectbuff$size <<- collectbuffsize + 1 
-  
+	
 }
 
