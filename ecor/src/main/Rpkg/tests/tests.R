@@ -28,8 +28,12 @@ test2 <- function () {
 	rmsg$clickId <- charToRaw('012345566')
 	rmsg$sessionId <- charToRaw('kdfklsdf')
 	rmsg$clickThru <- list()
+	rmsg$clickThru$advertiserAccountNumber <- 'kwerklsdfsdf'
+	
+	rmsg$serverTimeUTC <- as.numeric(Sys.time())*1000
 	
 	p <- proto.toProtoBldr( rmsg, d )
+	p <- proto.toProtoRaw( rmsg, d)
 }
 
 

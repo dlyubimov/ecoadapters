@@ -279,23 +279,6 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	buff
 }
 
-# converts jobjRef to java.util.Map into R list
-.ecor.jmap2list <- function ( jmap ) { 
-	
-	r <- list()
-	
-	iterator <- jmap$iterator()
-	
-	while (iterator$hasNext() ) {
-		entry <- iterator$'next'()
-		key <- as.character(entry$getKey())
-		# assuming rJava supported conversion only 
-		value <- entry$getValue()
-		r[[key]] <- value
-		
-	}
-	r
-}
 
 .ecor.tasksetup <- function ( jconf, mapsetup=T ) {
 	
