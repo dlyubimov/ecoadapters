@@ -35,7 +35,7 @@ proto.fromProtoMsg <- function ( message ) {
 }
 
 proto.fromProtoRaw <- function ( rawmsg, descriptor ) 
-		proto.fromProtoMsg(J("com.google.protobuf.DynamicMessage")$parseFrom(descriptor, rawmsg), descriptor)
+		proto.fromProtoMsg(J("com.google.protobuf.DynamicMessage")$parseFrom(descriptor, rawmsg))
 
 proto.toProtoBldr <- function ( x, descriptor ) {
 	
