@@ -23,12 +23,14 @@
 # generic initialization #
 ##########################
 
-.onLoad <- function (libname,pkgname) .ecor.init(libname,pkgname, pkgInit=T)
+.onLoad <- function (libname=NULL,pkgname=NULL) .ecor.init(libname,pkgname, pkgInit=T)
 .onUnload <- function(libpath) rm(ecor) 
 
-.ecor.init <- function(libname = NULL, pkgname = NULL, pkgInit = F) {
+.ecor.init <- function(libname, pkgname, pkgInit = F) {
 	
 	require(rJava)
+	
+	if ( length(pkgname) == 0 ) pkgname <- "ecor"
 	
 	ecor <- list()
 	
@@ -47,10 +49,10 @@
 		if ( nchar(ecoHome)==0 )
 			stop ("for initializing from maven tree, set ECO_HOME variable.")
 		
-		libdir <- paste ( ecoHome, "target",sep = "/")
+		libdir <- file.path ( ecoHome, "target")
 		pkgdir <- list.files(libdir, pattern= "^ecor-.*-rpkg$", full.names=T)
-		cp <- c ( list.files(paste(pkgdir,"java",sep="/"),pattern="\\.jar$",full.names=T),
-				paste(libdir,"test-classes",sep="/"))
+		cp <- c ( list.files( file.path(pkgdir, "java"),pattern="\\.jar$",full.names=T),
+				file.path(libdir,"test-classes"))
 		.jinit(classpath = c(hadoopcp,cp))
 		
 		ecor$cp <- cp
@@ -153,7 +155,7 @@ ecor.hconf <- function() {
 	a <- character(0); class(a) <- "hconf";
 	
 	# set some defaults 
-	ecor.map(a) <- "com.inadco.ecoadapters.r.ProtoRMapper"
+	ecor.map(a) <- "com.inadco.ecoadapters.r.RMapper"
 	ecor.inputFormat(a) <- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
 	ecor.outputFormat(a) <- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
 	
@@ -280,7 +282,7 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 }
 
 
-.ecor.tasksetup <- function ( jconf, mapsetup=T ) {
+.ecor.tasksetup <- function ( jconf, jcontext, mapsetup=T ) {
 	
 	conf <- .ecor.jconf2hconf(jconf)
 	
@@ -295,9 +297,7 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	
 	require(packages)
 	
-	
 	ecor$conf <<- conf
-	
 	
 	filePaths <- as.list(J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles())
 	filePaths <- sapply(filePaths, function(x) x$toString() )
@@ -325,13 +325,17 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	collectbuff <<- ecor.collectbuff()
 }
 
+.ecor.maptask <- function (jconf, jcontext, jkey, jvalue ) {
+	
+}
+
 
 # to be called internally by protobuf mapper 
-.ecor.protomaptask <- function ( key, jmapvalue ) {
-	value <- ecor.jmap2list(jmapValue)
+.ecor.protomaptask <- function ( key, msgBytes ) {
+	value <- proto.fromProtoRaw( msgBytes, ecor$d )
 	collectbuff <<- .ecor.collectbuff()
 	tryCatch({
-				MAPFUN(key,jmapvalue )
+				MAPFUN(key,value )
 				collectbuff
 			},
 			finally = { 
@@ -353,9 +357,14 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 
 ecor.collect <- function (key, value) {
 	
-	collectbuff$keys[[ collectbuffsize ]] <- key
-	collectbuff$values[[ collectbuffsize ]] <- value
-	collectbuff$size <<- collectbuffsize + 1 
+	collectbuff$keys[[ collectbuffsize ]] <- switch(mode(key), 
+			numeric=key,
+			integer=key,
+			character=key,
+			serialize(key,NULL))
+	
+	collectbuff$values[[ collectbuff$size ]] <- serialize(value,NULL)
+	collectbuff$size <- collectbuff$size + 1 
 	
 }
 

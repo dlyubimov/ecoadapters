@@ -34,8 +34,14 @@ test2 <- function () {
 	
 	p <- proto.toProtoBldr( rmsg, d )
 	p <- proto.toProtoRaw( rmsg, d)
+	
+	rl <- proto.fromProtoRaw(p,d)
+
+	expect_that(rawToChar(rl$sessionId),equals('kdfklsdf'))
+	expect_that(rl$clickThru$advertiserAccountNumber, equals('kwerklsdfsdf'))
 }
 
-
+context("prototests")
+test_that("protoconversions",test2())
 
 
