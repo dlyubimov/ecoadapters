@@ -1,0 +1,12 @@
+
+package inadco.logs.pipeline;
+option java_package= "com.inadco.ecoadapters.ecor.tests.codegen";
+option optimize_for = SPEED;
+
+message EcorTest  {
+
+  optional bytes idbuff = 1;
+  optional string string = 2;
+  repeated double vector = 3;
+
+}

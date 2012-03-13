@@ -7,7 +7,7 @@
 
 
 test1 <- function () {
-	.ecor.init()
+
   hconf <- ecor.hconf()
   ecor.input(hconf) <- "/home/dmitriy/ecortests"
   ecor.output(hconf) <- "/home/dmitriy/ecortestsout"

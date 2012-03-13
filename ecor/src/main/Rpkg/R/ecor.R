@@ -34,7 +34,7 @@
 	
 	ecor <- list()
 	
-	hadoopcp <- .ecor.hadoopClassPath()
+	hadoopcp <- ecor.hadoopClassPath()
 	
 	if ( pkgInit ) {
 		.jpackage(pkgname, morePaths = hadoopcp, lib.loc = libname)
@@ -85,13 +85,13 @@
 	ecor <<- ecor
 }
 
-.ecor.hadoopClassPath <- function () {
+ecor.hadoopClassPath <- function () {
 	hhome <- Sys.getenv("HADOOP_HOME")
 	
 	if ( nchar(hhome) ==0 )
 		stop ("HADOOP_HOME not set")
 	
-	hlibdir <- paste (hhome, "lib", sep="/")
+	hlibdir <- file.path (hhome, "lib")
 	if ( ! file.exists(hlibdir))
 		stop ( sprintf("cannot find %s directory.", hlibdir))
 	
@@ -110,7 +110,57 @@
 	c(hadooplib,hadoopcore)
 }
 
-.ecor.checkInit <- function() if ( !exists(ecor) ) ecor.init()
+ecor.hBaseClassPath <- function () {
+	hhome <- Sys.getenv("HBASE_HOME")
+	
+	if ( nchar(hhome) ==0 )
+		stop ("HBASE_HOME not set")
+	
+	hlibdir <- file.path (hhome, "lib")
+	if ( ! file.exists(hlibdir))
+		stop ( sprintf("cannot find %s directory.", hlibdir))
+	
+	
+	hbaselib <- list.files(
+			hlibdir,
+			full.names = T,
+			pattern="\\.jar$")
+	
+	hbasecore <- list.files (
+			hhome,
+			full.names=T,
+			pattern=".*core.*\\.jar"
+	)
+	
+	c(hbaselib,hbasecore)
+}
+
+
+ecor.pigClassPath <- function () {
+	hhome <- Sys.getenv("PIG_HOME")
+	
+	if ( nchar(hhome) ==0 )
+		stop ("PIG_HOME not set")
+	
+	hlibdir <- file.path (hhome, "lib")
+	if ( ! file.exists(hlibdir))
+		stop ( sprintf("cannot find %s directory.", hlibdir))
+	
+	
+	piglib <- list.files(
+			hlibdir,
+			full.names = T,
+			pattern="\\.jar$")
+	
+	pigcore <- list.files (
+			hhome,
+			full.names=T,
+			pattern=".*core.*\\.jar"
+	)
+	
+	c(piglib,pigcore)
+}
+
 
 ##################################
 # generic MR job driver          #
