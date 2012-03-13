@@ -1,3 +1,2 @@
 import(rJava)
-importFrom(rJava,.jarray)
-exportPattern("^hbl\\.")
+exportPattern("^ecor\\.")
