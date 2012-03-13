@@ -28,7 +28,7 @@
 
 .ecor.init <- function(libname, pkgname, pkgInit = F) {
 	
-	require(rJava)
+	library(rJava)
 	
 	if ( length(pkgname) == 0 ) pkgname <- "ecor"
 	
