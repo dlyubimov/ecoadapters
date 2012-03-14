@@ -14,7 +14,7 @@
 
   <groupId>com.inadco.ecoadapters</groupId>
   <artifactId>ecoadapters-parent</artifactId>
-  <version>0.3.18-SNAPSHOT</version>
+  <version>0.4.0-SNAPSHOT</version>
   <name>Inadco :: Ecoadapters :: Parent </name>
 
   <packaging>pom</packaging>
