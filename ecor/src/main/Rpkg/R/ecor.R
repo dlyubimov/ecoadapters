@@ -1,22 +1,23 @@
-# TODO: R wrapper for running ecor queries etc. using rJava
-#  
-# to enable running R on task nodes: 
-
-# * install R 
-# * install.packages("rJava")
-# * configure R_HOME variable in the mapred user env (or whichever user runs the tasks)
-#   on Ubuntu it is usually /usr/lib/R
-# * symbolic-link /lib64/libjri.so -> /usr/local/lib/R/site-library/rJava/jri/libjri.so
-#   (or otherwise make sure libjri.so is available thru java.library.path at the time 
-#    of MR task loading)
-#
-#   The following command should produce location dir of libjri.so:
-#
-#   R --vanilla <<< 'system.file("jri", package="rJava")'
-# 
-# Author: dmitriy
-###############################################################################
-
+#' R wrapper for running ecor queries etc. using rJava
+#'  
+#' to enable running R on task nodes:
+#' 
+#' \enumerate{
+#' \item{ install R } 
+#' \item{ \code{install.packages("rJava")}}
+#' \item{ configure R_HOME variable in the mapred user env (or whichever user runs the tasks)
+#'   on Ubuntu it is usually /usr/lib/R }
+#' \item{ symbolic-link /lib64/libjri.so -> /usr/local/lib/R/site-library/rJava/jri/libjri.so
+#'   (or otherwise make sure libjri.so is available thru java.library.path at the time 
+#'    of MR task loading) }
+#' }
+#' \strong{Tip:} The following command should produce location dir of libjri.so:
+#' \code{R --vanilla <<< 'system.file("jri", package="rJava")'}
+#' 
+#' @docType package
+#' @name ecor
+#' @author: dmitriy
+NULL
 
 
 ##########################
@@ -85,6 +86,12 @@
 	ecor <<- ecor
 }
 
+
+#' Discover hadoop class path
+#' 
+#' Discover hadoop classpath based on HADOOP_HOME environment variable.
+#' 
+#' @author dmitriy
 ecor.hadoopClassPath <- function () {
 	hhome <- Sys.getenv("HADOOP_HOME")
 	
@@ -110,6 +117,11 @@ ecor.hadoopClassPath <- function () {
 	c(hadooplib,hadoopcore)
 }
 
+#' Produce local hbase path
+#' 
+#' Produce local hbase path
+#' 
+#' @author dmitriy
 ecor.hBaseClassPath <- function () {
 	hhome <- Sys.getenv("HBASE_HOME")
 	
