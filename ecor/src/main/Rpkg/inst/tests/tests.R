@@ -22,23 +22,31 @@ test1 <- function () {
 }
 
 test2 <- function () {
-	d <- proto.desc('hdfs://localhost:11010/data/inadco/protolib/inadco-fas.protodesc?msg=inadco.logs.pipeline.FASClick')
+	d <- proto.desc('com.inadco.ecoadapters.ecor.tests.codegen.Tests$EcorTest')
 
 	rmsg <- list()
-	rmsg$clickId <- charToRaw('012345566')
-	rmsg$sessionId <- charToRaw('kdfklsdf')
-	rmsg$clickThru <- list()
-	rmsg$clickThru$advertiserAccountNumber <- 'kwerklsdfsdf'
+	rmsg$idbuff <- charToRaw('012345566')
+	rmsg$str <- 'this is a string'
 	
-	rmsg$serverTimeUTC <- as.numeric(Sys.time())*1000
-	
+	# can use either atomic vector or a list with integral 
+	# subscripting
+	rmsg$rvector <- c(5,2)
+	rmsg$timeAttr <- as.numeric(Sys.time())*1000
+	rmsg$nested1 <- list()
+	rmsg$nested1$name <- "nested1"
+    rmsg$nested2 <- list()
+	rmsg$nested2[[1]] <- list()
+	rmsg$nested2[[1]]$name <- "nested2-1"
+    rmsg$nested2[[2]]<-list()
+	rmsg$nested2[[2]]$name <- "nested2-2"
+
 	p <- proto.toProtoBldr( rmsg, d )
 	p <- proto.toProtoRaw( rmsg, d)
 	
 	rl <- proto.fromProtoRaw(p,d)
 
-	expect_that(rawToChar(rl$sessionId),equals('kdfklsdf'))
-	expect_that(rl$clickThru$advertiserAccountNumber, equals('kwerklsdfsdf'))
+	expect_that(rawToChar(rl$idbuff),equals('012345566'))
+	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a strin'))
 }
 
 context("prototests")

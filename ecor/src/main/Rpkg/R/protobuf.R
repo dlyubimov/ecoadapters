@@ -99,12 +99,12 @@ proto.toProtoRaw <- function (x, descriptor ) proto.toProtoMsg(x, descriptor)$to
 			},
 			
 			# UNSUPPORTED:
-#			GROUP = ,	
+			# GROUP = ,	
 			stop (sprintf("unsupported conversion type %s.",protoType))
 	)
 }
 
-.proto.repeatedFieldToProto <- function (x, fd) sapply(x, function(x) .proto.field2Proto(x,fd))
+.proto.repeatedFieldToProto <- function (x, fd) sapply(x, function(x) .proto.fieldToProto(x,fd))
 
 .proto.fieldFromProto <- function(x, fd ) { 
 	# shouldn't be any NULLs when converting from proto
@@ -113,20 +113,20 @@ proto.toProtoRaw <- function (x, descriptor ) proto.toProtoMsg(x, descriptor)$to
 
 			ENUM = x$toString(), # ?
 			BYTES = as.raw(x$toByteArray()),
-			BOOL = as.logical(x),
-			DOUBLE = as.numeric(x),
-			FIXED32 = as.integer(x),
-			FIXED64 = as.numeric(x), 
-			FLOAT = as.numeric(x),
-			INT32 = as.integer(x),
-			INT64 = as.numeric(x),
-			SFIXED32 = as.integer(x),
-			SFIXED64 = as.numeric(x),
-			SINT32 = as.integer(x),
-			SINT64 = as.numeric(x),
+			BOOL = x$booleanValue(),
+			DOUBLE = x$doubleValue(),
+			FIXED32 = x$intValue(),
+			FIXED64 = x, 
+			FLOAT = x$doubleValue(),
+			INT32 = x$intValue(),
+			INT64 = x,
+			SFIXED32 = x$intValue(),
+			SFIXED64 = x,
+			SINT32 = x$intValue(),
+			SINT64 = x,
 			STRING = as.character(x),
-			UINT32 = as.integer(x),
-			UINT64 = as.numeric(x),
+			UINT32 = x$intValue(),
+			UINT64 = x,
 			MESSAGE = proto.fromProtoMsg (x),
 			
 			# UNSUPPORTED:

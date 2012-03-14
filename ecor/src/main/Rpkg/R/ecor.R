@@ -26,7 +26,7 @@
 .onLoad <- function (libname=NULL,pkgname=NULL) .ecor.init(libname,pkgname, pkgInit=T)
 .onUnload <- function(libpath) rm(ecor) 
 
-.ecor.init <- function(libname, pkgname, pkgInit = F) {
+.ecor.init <- function(libname=NULL, pkgname=NULL, pkgInit = F) {
 	
 	library(rJava)
 	
@@ -51,7 +51,7 @@
 		
 		libdir <- file.path ( ecoHome, "target")
 		pkgdir <- list.files(libdir, pattern= "^ecor-.*-rpkg$", full.names=T)
-		cp <- c ( list.files( file.path(pkgdir, "java"),pattern="\\.jar$",full.names=T),
+		cp <- c ( list.files( file.path(pkgdir, "inst", "java"),pattern="\\.jar$",full.names=T),
 				file.path(libdir,"test-classes"))
 		.jinit(classpath = c(hadoopcp,cp))
 		
