@@ -60,6 +60,8 @@
                       <arg value="${rpkg-name}" />
                       <!-- maven version -->
                       <arg value="${project.version}" />
+                      <!-- pkg src -->
+                      <arg value="${basedir}/src/main/Rpkg"/>
                       <!-- output R pkg -->
                       <arg value="${basedir}/target/generated-sources/R/Rpkg"/>
                     </exec>
