@@ -10,6 +10,10 @@ message EcorTest {
   optional fixed64 timeAttr = 4;
   optional EcorNested nested1 = 5;
   repeated EcorNested nested2 = 6;
+  repeated uint64 rvector2 = 7;
+  repeated float floatval = 8;
+  optional uint32 intval = 9;
+  optional bool boolval = 10;
 
 }
 

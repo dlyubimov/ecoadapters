@@ -31,6 +31,9 @@ test2 <- function () {
 	# can use either atomic vector or a list with integral 
 	# subscripting
 	rmsg$rvector <- c(5,2)
+	rmsg$rvector2 <- list()
+	rmsg$rvector2[[1]] <- 1
+	rmsg$rvector2[[2]] <- 2
 	rmsg$timeAttr <- as.numeric(Sys.time())*1000
 	rmsg$nested1 <- list()
 	rmsg$nested1$name <- "nested1"
@@ -39,6 +42,10 @@ test2 <- function () {
 	rmsg$nested2[[1]]$name <- "nested2-1"
     rmsg$nested2[[2]]<-list()
 	rmsg$nested2[[2]]$name <- "nested2-2"
+	rmsg$floatval <- 32.0
+	rmsg$intval <- 32
+	rmsg$boolval <- T
+	
 
 	p <- proto.toProtoBldr( rmsg, d )
 	p <- proto.toProtoRaw( rmsg, d)
