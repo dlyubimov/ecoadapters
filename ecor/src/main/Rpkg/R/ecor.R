@@ -16,7 +16,10 @@
 #' 
 #' @docType package
 #' @name ecor
-#' @author: dmitriy
+#' @exportPattern "^ecor\\."
+#' @import rJava
+#' @include protobuf.R
+#' @include sequenceFile.R
 NULL
 
 
@@ -147,7 +150,10 @@ ecor.hBaseClassPath <- function () {
 	c(hbaselib,hbasecore)
 }
 
-
+#' Detect pig classpath.
+#' 
+#' stop if not found (looking for PIG_HOME).
+#'  
 ecor.pigClassPath <- function () {
 	hhome <- Sys.getenv("PIG_HOME")
 	

@@ -41,11 +41,7 @@ file.copy(from=files2copy,to="${outdir}", recursive=T)
 
 # gen docs 
 library("roxygen2")
-roxygenize(package.dir="${outdir}", roclets="rd")
-
-#library(roxygen)
-#roxygenize(package.dir="${pkgdir}")
-
-
+#roxygenize(package.dir="${outdir}", roclets="rd")
+roxygenize(package.dir="${outdir}")
 
 EOF
