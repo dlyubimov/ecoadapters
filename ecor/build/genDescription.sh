@@ -22,8 +22,10 @@ descrFile=$outdir/DESCRIPTION
 
 d=`date +%F`
 
+h=`date +%Y%M%d%H%m%S`
+
 # strip -SNAPSHOT things that create problems 
-rver=`sed 's/-SNAPSHOT\$/-00000000/' <<< $mver`
+rver=`sed "s/-SNAPSHOT\$/-$h/" <<< $mver`
 
 echo $ver
 
