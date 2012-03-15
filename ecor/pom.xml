@@ -196,11 +196,39 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>ecoadapters</artifactId>
     </dependency>
-
+    
     <dependency>
       <groupId>org.r-project</groupId>
       <artifactId>jri</artifactId>
+      <scope>provided</scope>
     </dependency>
+    
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase</artifactId>  
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>  
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- pig -->
+    <dependency>
+      <groupId>org.apache.pig</groupId>
+      <artifactId>pig</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    
 
     <!-- test -->
     <dependency>

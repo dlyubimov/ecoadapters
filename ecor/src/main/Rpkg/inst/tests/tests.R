@@ -53,7 +53,7 @@ test2 <- function () {
 	rl <- proto.fromProtoRaw(p,d)
 
 	expect_that(rawToChar(rl$idbuff),equals('012345566'))
-	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a strin'))
+	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a string'))
 }
 
 context("prototests")
