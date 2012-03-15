@@ -144,7 +144,7 @@ ecor.hBaseClassPath <- function () {
 	hbasecore <- list.files (
 			hhome,
 			full.names=T,
-			pattern=".*core.*\\.jar"
+			pattern="^hbase-.*\\.jar"
 	)
 	
 	c(hbaselib,hbasecore)
