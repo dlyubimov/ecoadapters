@@ -69,7 +69,22 @@ test2 <- function () {
 	
 	rl <- proto.fromProtoRaw(p,d)
 
-#	expect_that(rawToChar(rl$idbuff),equals('012345566'))
+	sfw <- ecor.SequenceFileW$new("/temp/swftest1.seq",
+			valWritable=ecor.ProtoWritable$new(
+					'com.inadco.ecoadapters.ecor.tests.codegen.Tests$EcorTest'))
+	
+	tryCatch({
+				#so vectorizaton and recycling
+				# is now supported by append. 
+				# we can write batches from vectors at once.
+				for ( i in 1:1000)	sfw$append("",p)
+			}, 
+			finally = {
+				sfw$close()
+			}
+	)
+	
+	#	expect_that(rawToChar(rl$idbuff),equals('012345566'))
 #	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a string'))
 }
 

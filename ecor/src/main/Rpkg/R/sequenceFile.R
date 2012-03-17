@@ -19,7 +19,26 @@ write.Text <- function(x) {
 
 initialize.BytesWritable <- function () setJClass(J("org.apache.hadoop.io.BytesWritable"))
 read.BytesWritable <- function() jwritable$getBytes()[1:jwritable$getLength()]
-write.BytesWritable <- function(x) jwritable$set(.jarray(as.raw(x)),0,length(x)-1)
+write.BytesWritable <- function(x) {
+	len <- length(x)
+	x <- if (len == 0  ) .jnull("[B") else .jarray(as.raw(x)) 
+	
+	#jwritable$set(.jarray(as.raw(x)),0,length(x)-1)
+	.jcall(jwritable,"V","set", x, 0, len-1 )
+}
+
+initialize.ProtoWritable <- function ( protoDesc ) { 
+	callSuper();
+	protodesc <<- protoDesc(protoDesc)
+}
+
+read.ProtoWritable <- function() 
+	proto.fromProtoRaw(callSuper(), protodesc)
+
+write.ProtoWritable <- function ( rlist ) 
+	callSuper(proto.toProtoRaw(rlist,protodesc))
+
+
 
 
 #' Constructor for the SequenceFileW class
@@ -134,12 +153,20 @@ ecor.Text <- setRefClass("Text",
 				read=read.Text
 		))
 
-ecor.BytesWritable <- setRefClass("BytesWriable",contains="Writable",
+ecor.BytesWritable <- setRefClass("BytesWritable",contains="Writable",
 		methods=list(
 				initialize=initialize.BytesWritable,
 				read=read.BytesWritable,
 				write=write.BytesWritable
 		))
+
+ecor.ProtoWritable <- setRefClass("ProtoWritable", contains="BytesWritable",
+		fields = c("protodesc"),
+		methods = list (
+				initialize=initialize.ProtoWritable,
+				read=read.ProtoWritable,
+				write=write.ProtoWritable
+				))
 
 ecor.SequenceFileW <- setRefClass("SequenceFileW",
 		fields=c("keyw","valw","jw","isClosed"))
