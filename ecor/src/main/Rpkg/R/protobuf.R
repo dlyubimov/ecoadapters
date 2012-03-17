@@ -7,35 +7,40 @@ proto.desc <- function (descriptorUrl ) {
 	u <- as.character(descriptorUrl)
 	
 	if ( length( grep("^hdfs://",u) ) > 0 ) 
-		J("com.inadco.ecoadapters.EcoUtil")$inferDescriptorFromFilesystem(u)
+		.jcall("com/inadco/ecoadapters/EcoUtil", 
+				"Lcom/google/protobuf/Descriptors$Descriptor;", 
+				"inferDescriptorFromFilesystem",u)
 	else  
-		J("com.inadco.ecoadapters.EcoUtil")$inferDescriptorFromClassName(u)
+		.jcall("com/inadco/ecoadapters/EcoUtil", 
+				"Lcom/google/protobuf/Descriptors$Descriptor;", 
+				"inferDescriptorFromClassName",u)
 }
 
 
 proto.fromProtoMsg <- function ( message ) {
-
+	
 	if ( length(message) ==  0 ) return(NULL)
 	
-	
-	fdmap <- as.list(message$getAllFields()$entrySet())
+	entries <- .jcall(message,"Ljava/util/Map;","getAllFields")
+	entries <- .jcall(entries,"Ljava/util/Set;","entrySet")
+	fdmap <- as.list(entries)
 	
 	vals <- lapply(fdmap,function(entry) {
-		fd <- entry$getKey()
-		value <- entry$getValue()
-		
-		v<- NULL
-		if ( fd$isRepeated() ) 
-			.proto.repeatedFieldFromProto(value,fd)
-		else
-			.proto.fieldFromProto(value,fd)
-	})
+				fd <- .jcall(entry, "Ljava/lang/Object;", "getKey")
+				value <- .jcall(entry, "Ljava/lang/Object;", "getValue")
+				
+				v<- NULL
+				if ( fd$isRepeated() ) 
+					.proto.repeatedFieldFromProto(value,fd)
+				else
+					.proto.fieldFromProto(value,fd)
+			})
 	names(vals) <- sapply(fdmap, function(entry) entry$getKey()$getName() ) 
 	vals
 }
 
 proto.fromProtoRaw <- function ( rawmsg, descriptor ) 
-		proto.fromProtoMsg(J("com.google.protobuf.DynamicMessage")$parseFrom(descriptor, .jarray(as.raw(rawmsg))))
+	proto.fromProtoMsg(J("com.google.protobuf.DynamicMessage")$parseFrom(descriptor, .jarray(as.raw(rawmsg))))
 
 proto.toProtoBldr <- function ( x, descriptor ) {
 	
@@ -43,27 +48,44 @@ proto.toProtoBldr <- function ( x, descriptor ) {
 		return (NULL)
 	
 	x<- as.list(x)
-	bldr <- J("com.google.protobuf.DynamicMessage")$newBuilder(descriptor)
+	bldr <- .jcall("com.google.protobuf.DynamicMessage",
+			"Lcom/google/protobuf/DynamicMessage$Builder;",
+			"newBuilder", descriptor)
 	
 	lapply( names(x), function (fname ) {
-				fd <- descriptor$findFieldByName(fname)
+				fd <- .jcall(descriptor,
+						"Lcom/google/protobuf/Descriptors$FieldDescriptor;",
+						"findFieldByName",fname)
 				if ( length(fd) == 0 ) 
 					stop (sprintf("Unable to find field descriptor for '%s'.",fname))
 				else {
-					if ( fd$isRepeated() ) {
+					if ( .jcall(fd,"Z","isRepeated") ) {
 						v <- .proto.repeatedFieldToProto(x[[fname]],fd)
-						lapply(v, function(v) if ( length(v) >0 ) bldr$addRepeatedField(fd, v) )
+						lapply(v, function(v) if ( length(v) >0 ) 
+										.jcall(bldr,
+												"Lcom/google/protobuf/DynamicMessage$Builder;",
+												"addRepeatedField", 
+												fd, 
+												.jcast(v,"java.lang.Object") ))
 					} else { 
 						v <- .proto.fieldToProto(x[[fname]],fd)
-						if ( length(v) >0 ) bldr$setField(fd, v)
+						if ( length(v) > 0 ) .jcall(bldr,
+									"Lcom/google/protobuf/DynamicMessage$Builder;",
+									"setField",
+									fd, 
+									.jcast(v,"java.lang.Object"))
 					}
 				} 
 			})
 	bldr
 }
 
-proto.toProtoMsg <- function (x, descriptor ) proto.toProtoBldr(x, descriptor)$build()
-proto.toProtoRaw <- function (x, descriptor ) proto.toProtoMsg(x, descriptor)$toByteArray()
+proto.toProtoMsg <- function (x, descriptor ) .jcall(
+			proto.toProtoBldr(x, descriptor),
+			"Lcom/google/protobuf/DynamicMessage;","build")
+proto.toProtoRaw <- function (x, descriptor ) .jcall(
+			proto.toProtoMsg(x, descriptor),
+			"[B", "toByteArray",evalArray=T)
 
 .proto.fieldToProto <- function (x, fd ) {
 	
@@ -74,25 +96,35 @@ proto.toProtoRaw <- function (x, descriptor ) proto.toProtoMsg(x, descriptor)$to
 		# which may be transformed to an empty builder.
 		return (NULL)
 	
-	protoType <- fd$getType()$name()
+	# slow
+	# protoType <- fd$getType()$name()
+	protoType <- .jcall(fd,"Lcom/google/protobuf/Descriptors$FieldDescriptor$Type;","getType")
+	protoType <- .jcall(protoType,"S","name")
+	
 	switch(protoType,
 			
 			ENUM = as.character(x), # ?
-			BYTES = J("com.google.protobuf.ByteString")$copyFrom(.jarray(as.raw(x))),
-			BOOL = new(J("java.lang.Boolean"), as.logical(x)),
-			DOUBLE = new ( J("java.lang.Double"), as.numeric(x)),
-			FIXED32 = new (J("java.lang.Integer"), as.integer(x)),
-			FIXED64 = new(J("java.lang.Long"),.jlong(as.numeric(x))), 
-			FLOAT = new (J("java.lang.Float"),.jfloat(as.numeric(x))),
-			INT32 = new (J("java.lang.Integer"), as.integer(x)),
-			INT64 = new(J("java.lang.Long"),.jlong(as.numeric(x))),
-			SFIXED32 = new (J("java.lang.Integer"), as.integer(x)),
-			SFIXED64 = new(J("java.lang.Long"),.jlong(as.numeric(x))),
-			SINT32 = new (J("java.lang.Integer"), as.integer(x)),
-			SINT64 = new(J("java.lang.Long"),.jlong(as.numeric(x))),
-			STRING = as.character(x),
-			UINT32 = new (J("java.lang.Integer"), as.integer(x)),
-			UINT64 = new(J("java.lang.Long"),.jlong(as.numeric(x))),
+			
+			BYTES = .jcall("com.google.protobuf.ByteString",
+					"Lcom/google/protobuf/ByteString;", 
+					"copyFrom", .jarray(as.raw(x))),
+			
+			BOOL = .jnew("java.lang.Boolean", as.logical(x)),
+			
+			DOUBLE = .jnew ( "java.lang.Double", as.numeric(x)),
+			
+			FIXED32 = .jnew ("java.lang.Integer", as.integer(x)),
+			FIXED64 = .jnew ("java.lang.Long",.jlong(as.numeric(x))), 
+			FLOAT = .jnew ("java.lang.Float",.jfloat(as.numeric(x))),
+			INT32 = .jnew ("java.lang.Integer", as.integer(x)),
+			INT64 = .jnew ("java.lang.Long",.jlong(as.numeric(x))),
+			SFIXED32 = .jnew ("java.lang.Integer", as.integer(x)),
+			SFIXED64 = .jnew ("java.lang.Long",.jlong(as.numeric(x))),
+			SINT32 = .jnew ("java.lang.Integer", as.integer(x)),
+			SINT64 = .jnew ("java.lang.Long",.jlong(as.numeric(x))),
+			STRING = .jnew("java.lang.String",as.character(x)),
+			UINT32 = .jnew ("java.lang.Integer", as.integer(x)),
+			UINT64 = .jnew ("java.lang.Long",.jlong(as.numeric(x))),
 			MESSAGE = {
 				d <- fd$getMessageType()
 				proto.toProtoMsg (x, d)
@@ -107,26 +139,33 @@ proto.toProtoRaw <- function (x, descriptor ) proto.toProtoMsg(x, descriptor)$to
 .proto.repeatedFieldToProto <- function (x, fd) sapply(x, function(x) .proto.fieldToProto(x,fd))
 
 .proto.fieldFromProto <- function(x, fd ) { 
+	
 	# shouldn't be any NULLs when converting from proto
-	protoType <- fd$getType()$name()
+	# protoType <- fd$getType()$name()
+	# these descriptors probably should be cached in the R structures 
+	# to speed things up even more, later.
+	
+	protoType <- .jcall(fd,"Lcom/google/protobuf/Descriptors$FieldDescriptor$Type;","getType")
+	protoType <- .jcall(protoType,"S","name")
+	
 	switch(protoType,
-
-			ENUM = x$toString(), # ?
-			BYTES = as.raw(x$toByteArray()),
-			BOOL = x,
-			DOUBLE = x$doubleValue(),
-			FIXED32 = x,
-			FIXED64 = x, 
-			FLOAT = x$doubleValue(), #?
-			INT32 = x,
-			INT64 = x,
-			SFIXED32 = x,
-			SFIXED64 = x,
-			SINT32 = x,
-			SINT64 = x,
-			STRING = as.character(x),
-			UINT32 = x,
-			UINT64 = x,
+			
+			ENUM = .jcall(x,"S","toString"), 
+			BYTES = .jcall(x,"[B","toByteArray",evalArray=T),
+			BOOL = .jsimplify(x),
+			DOUBLE = .jcall(x,"D","doubleValue"),
+			FIXED32 = .jsimplify(x),
+			FIXED64 = .jsimplify(x), 
+			FLOAT = .jcall(x,"D","doubleValue"), #?
+			INT32 = .jsimplify(x),
+			INT64 = .jsimplify(x),
+			SFIXED32 = .jsimplify(x),
+			SFIXED64 = .jsimplify(x),
+			SINT32 = .jsimplify(x),
+			SINT64 = .jsimplify(x),
+			STRING = .jsimplify(x),
+			UINT32 = .jsimplify(x),
+			UINT64 = .jsimplify(x),
 			MESSAGE = proto.fromProtoMsg (x),
 			
 			# UNSUPPORTED:

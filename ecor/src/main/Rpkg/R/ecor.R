@@ -116,8 +116,13 @@ ecor.hadoopClassPath <- function () {
 			full.names=T,
 			pattern=".*core.*\\.jar"
 	)
+	# ensure config is loaded form 
+	# the client dir 
+	hadoopconf <- file.path(hhome,"conf")
+	if ( ! file.exists(hadoopconf) )
+		stop ("Unable to find hadoop configuration files.")
 	
-	c(hadooplib,hadoopcore)
+	c(hadooplib, hadoopcore, hadoopconf)
 }
 
 #' Produce local hbase path
@@ -146,8 +151,11 @@ ecor.hBaseClassPath <- function () {
 			full.names=T,
 			pattern="^hbase-.*\\.jar"
 	)
+	hbconf <- file.path(hhome,"conf")
+	if ( ! file.exists(hadoopconf) )
+		stop ("Unable to find hbase configuration files.")
 	
-	c(hbaselib,hbasecore)
+	c(hbaselib,hbasecore,hbconf)
 }
 
 #' Detect pig classpath.

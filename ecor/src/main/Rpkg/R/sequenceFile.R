@@ -1,61 +1,49 @@
 
 
-.onLoad<- function () { 
-
-ecor.Writable <- setRefClass("Writable", 
-		fields=c("jwritable", "jwClass"),
-		methods=list(
-				initialize=initialize.Writable,
-				write=function(x) NULL, 
-				read=function() NULL ))
-
-ecor.Text <- setRefClass("Text", contains="Writable", 
-		methods=list(initialize=initialize.Text),
-		write=write.Text,
-		read=read.Text)
-
-ecor.BytesWritable <- setRefClass("BytesWriable",contains="Writable",
-		methods=list(
-				initialize=initialize.BytesWritable,
-				read=read.BytesWritable,
-				write=write.BytesWritable
-))
-
-ecor.SequenceFileW <- setRefClass("SequenceFileW",
-		fields=c("keySer","valSer","wj","isClosed"))
-
-}
-
-
-#' Constructor for the SequenceFileW class.
-ecor.SequenceFileW$methods(
-		initialize = initialize.SequenceFileW,
-		finalize= function() {
-			if ( ! isClosed ) 
-				close()
-		}
-	)
-
-initialize.Writable <- function (jClass ) {
+setJClass.Writable <- function (jClass ) {
 	jwClass<<-jClass
 	jwritable <<- new(jClass)
 }
 
-initialize.Text <- function () callSuper(J("org.apache.hadoop.io.Text"))
-read.Text <- function() jwritable$toString()
-write.Text <- function(x) jwritable$set(as.character(x)) 
 
-initialize.BytesWritable <- function () callSuper(J("org.apache.hadoop.io.BytesWritable"))
+initialize.Text <- function() setJClass(J("org.apache.hadoop.io.Text"))
+read.Text <- function() jwritable$toString()
+write.Text <- function(x) {
+	x <- as.character(x)
+	if ( length(x)!= 1 ) stop ("Writable: only writing singletons is allowed.")
+	
+	# this is appallingly slow!
+	# jwritable$set(x)
+	.jcall(jwritable, "V", "set", x)
+}
+
+initialize.BytesWritable <- function () setJClass(J("org.apache.hadoop.io.BytesWritable"))
 read.BytesWritable <- function() jwritable$getBytes()[1:jwritable$getLength()]
 write.BytesWritable <- function(x) jwritable$set(.jarray(as.raw(x)),0,length(x)-1)
 
-	
+
+#' Constructor for the SequenceFileW class
+#' 
+#' Initialize a new instance 
+#' 
+#' TODO: codecs requiring native libraries are not loaded. 
+#' Need yet to figure how to solve that with rJava etc.
+#' 
+#' @param hdfsLocation location of the sequence file being written. 
+#' @param keyWritable R5 instance of a class derived from Writable class 
+#' to establish serialization for the key
+#' @param valWritable R5 instance of a class derived from Writable class
+#' @param compressionType For possible (character) values see 
+#' \code{org.apache.hadoop.io.SequenceFile$CompressionType} enumeration.
+#' Currently, possible values include 'NONE', 'BLOCK' or 'RECORD'.
+#' @param jcodecClass java codec to use. Should be result of 
+#' J("java-codec-class-name").
 initialize.SequenceFileW <- function(hdfsLocation,
 		keyWritable =ecor.Text$new() ,
-		valWritable =ecor.BytesWritable$new(),
+		valWritable =ecor.Text$new(),
 		compressionType="BLOCK",
-		jcodecClass,...) {
-
+		jcodecClass = J("org.apache.hadoop.io.compress.DefaultCodec"), ...) {
+	
 	callSuper(...)
 	
 	ct <- switch(compressionType, 
@@ -65,86 +53,102 @@ initialize.SequenceFileW <- function(hdfsLocation,
 			stop (sprintf("unsupported compression type %s",ct))
 	)
 	
-	jcodec <- if ( length(jcodecClass) == 0 ) NULL else jcodecClass$new()
+	jcodec <- if ( length(jcodecClass) == 0 ) NULL else new(jcodecClass)
 	jconf <- ecor$jconf
 	
-	keySer <<- keySerializer
-	valSer <<- valSerializer
+	if ( ! is(keyWritable, "Writable") )
+		stop("key writable must be of Writable class.")
+	if ( ! is(valWritable, "Writable") )
+		stop("value writable must be of Writable class.")
+	
+	keyw <<- keyWritable
+	valw <<- valWritable
 	isClosed <<- F
 	
-	hdfs <- J("org.apache.hadoop.fs.FileSystem")$getFileSystem(jconf) 
+	hdfs <- J("org.apache.hadoop.fs.FileSystem")$get(jconf) 
 	path <- new(J("org.apache.hadoop.fs.Path"),hdfsLocation)       
 	jw <<- J("org.apache.hadoop.io.SequenceFile")$createWriter(
-			hdfs,jconf,path,keySer$jwClass, valSer$jwClass, ct, jcodec )
+			hdfs,jconf,path,keyw$jwClass$class, valw$jwClass$class, ct, jcodec )
 	
 }
+
+append.SequenceFileW <- function (key,value) {
 	
+	if (isClosed) stop ("attempt to write to a closed writer.")
 
-ecor.createSeqFileWriter <- function (hdfsLocation,
-		keySerializer = "Text", 
-		valSerializer = "BytesWritable", 
-		compressionType="BLOCK",
-		codecClass = "org.apache.hadoop.io.compress.GzipCodec"
-	) {
+	kw <- .jcast(keyw$jwritable, "org.apache.hadoop.io.Writable")
+	vw <- .jcast(valw$jwritable, "org.apache.hadoop.io.Writable")
 	
-	w <- list()
-	class(w) <- "seqfilew"
-	w$keySerializer <- .ecor.serializer(keySerializer)
-	w$valSerializer <- .ecor.serializer(valSerializer)
-	
-	jKeyClass <- ecor.writable(w$keySerializer)$getClass()$getName()
-	jValClass <- ecor.writable(w$valSerializer)$getClass()$getName()
-	if ( length(codecClass==1 ) )
-		codec <- new(J(codecClass))
-	
-	ct <- switch(compressionType, 
-			NONE = J("org.apache.hadoop.io.SequenceFile.CompressionType")$NONE,
-			BLOCK = J("org.apache.hadoop.io.SequenceFile.CompressionType")$BLOCK,
-			RECORD = J("org.apache.hadoop.io.SequenceFile.CompressionType")$RECORD,
-			stop (sprintf("unsupported compression type %s",ct))
-			)
-	
+	# use "vectorized" version if arrays supplied.
+	if ( length(key)!= 1 || length(value) != 1 ) {
+		df <- data.frame(key=key, value=value, stringsAsFactors=F)
+		sapply(1:nrow(df), function(x) {
 
-	jconf <- ecor$jconf
-	
-	
-	
-    
-} 
-
-
-#' Create writable per mode strategy 
-ecor.createWritable <- function(serializer, ...) UseMethod("createWritable")
-
-#' Set writable per strategy based on R value
-#' 
-#' @param serializer the serializer instance 
-#' @param rVal the r value to set 
-ecor.toWritable <- function (serializer, rVal, ...) UseMethod("toWritable")
-
-#' extract R value 
-#' 
-#' extract R value based on serialization strategy from java writable
-#' 
-#' @param serializer the serializer instance 
-#' @param jwritable the java writable reference obtained with \link{ecor.createWritable}
-ecor.fromWritable <- function(serializer, ...) UseMethod("fromWritable")
-
-#' generic for reading writable java value
-ecor.writable(serializer) <- function(serializer ) UseMethod("writable")
-"ecor.writable<-"(serializer) <- function(serializer,value ) UserMethod("writable<-") 
-
-# default serializer constructor that doesn't 
-# initialize anything
-.ecor.serializer <- function (serializerClass) {
-	l <- list()
-	class(list()) <- c("writableSerializer", serializerClass) 
-} 
-
-writable.writableSerializer <- function (serializer) {
-	serializer$writable
+					# this is still pretty slow. 
+					# but more tolerable at this point. 
+					# we may have to wrap it all in a single java-side 
+					# helper call later.
+					
+					
+					keyw$write(df[x,"key"])
+					valw$write(df[x,"value"])
+					
+					#slow!
+					#jw$append(keyw$jwritable, valw$jwritable )
+					
+					.jcall(jw,"V","append", kw,vw)
+				})
+		NULL
+	} else { 
+		keyw$write(key)
+		valw$write(value)
+		
+		# slow!!!
+		# jw$append(keyw$jwritable, valw$jwritable )
+		.jcall(jw,"V","append",kw,vw)
+	}
 }
 
-"writable<-.writableSerializer" <- function (serializer, value) {
-	serializer$writable <- value
-}
+close.SequenceFileW <- function()  
+  	if( !isClosed ) { 
+		isClosed <<- T; jw$close() 
+	}
+
+###############
+# R5 class declarations
+###############
+
+ecor.Writable <- setRefClass("Writable", 
+		fields=c("jwritable", "jwClass" ),
+		methods=list(
+				setJClass=setJClass.Writable,
+				write=function(x) NULL, 
+				read=function() NULL 
+		))
+
+ecor.Text <- setRefClass("Text", 
+		contains="Writable",
+		methods=list(
+				initialize=initialize.Text,
+				write=write.Text,
+				read=read.Text
+		))
+
+ecor.BytesWritable <- setRefClass("BytesWriable",contains="Writable",
+		methods=list(
+				initialize=initialize.BytesWritable,
+				read=read.BytesWritable,
+				write=write.BytesWritable
+		))
+
+ecor.SequenceFileW <- setRefClass("SequenceFileW",
+		fields=c("keyw","valw","jw","isClosed"))
+
+ecor.SequenceFileW$methods(
+		initialize = initialize.SequenceFileW,
+		append = append.SequenceFileW,
+		close = close.SequenceFileW,
+		finalize= function() close()
+		
+)
+
