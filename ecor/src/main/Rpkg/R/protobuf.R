@@ -24,7 +24,7 @@ proto.fromProtoMsg <- function ( message ) {
 	entries <- .jcall(message,"Ljava/util/Map;","getAllFields")
 	entries <- .jcall(entries,"Ljava/util/Set;","entrySet")
 	fdmap <- as.list(entries)
-
+	
 	fnames <- NULL
 	vals <- lapply(fdmap,function(entry) {
 				fd <- .jcall(entry, "Ljava/lang/Object;", "getKey")
