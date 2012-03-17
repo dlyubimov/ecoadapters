@@ -24,23 +24,32 @@ proto.fromProtoMsg <- function ( message ) {
 	entries <- .jcall(message,"Ljava/util/Map;","getAllFields")
 	entries <- .jcall(entries,"Ljava/util/Set;","entrySet")
 	fdmap <- as.list(entries)
-	
+
+	fnames <- NULL
 	vals <- lapply(fdmap,function(entry) {
 				fd <- .jcall(entry, "Ljava/lang/Object;", "getKey")
 				value <- .jcall(entry, "Ljava/lang/Object;", "getValue")
+				fnames <- c(fnames, .jcall(fd, "Ljava/lang/String;","getName",simplify=T))
 				
 				v<- NULL
-				if ( fd$isRepeated() ) 
+				if ( .jcall(fd,"Z","isRepeated" ) ) 
 					.proto.repeatedFieldFromProto(value,fd)
 				else
 					.proto.fieldFromProto(value,fd)
 			})
-	names(vals) <- sapply(fdmap, function(entry) entry$getKey()$getName() ) 
+	
+	names(vals) <- fnames
+	
 	vals
 }
 
 proto.fromProtoRaw <- function ( rawmsg, descriptor ) 
-	proto.fromProtoMsg(J("com.google.protobuf.DynamicMessage")$parseFrom(descriptor, .jarray(as.raw(rawmsg))))
+	proto.fromProtoMsg(.jcall(
+					"com.google.protobuf.DynamicMessage", 
+					"Lcom/google/protobuf/DynamicMessage;",
+					"parseFrom",
+					descriptor, 
+					.jarray(as.raw(rawmsg))))
 
 proto.toProtoBldr <- function ( x, descriptor ) {
 	
