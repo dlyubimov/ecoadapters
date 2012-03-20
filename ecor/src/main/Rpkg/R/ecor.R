@@ -16,7 +16,7 @@
 #' 
 #' @docType package
 #' @name ecor
-#' @exportPattern "^ecor\\."
+#' @exportPattern "^ecor\\.|^proto\\."
 #' @import rJava
 #' @include protobuf.R
 #' @include sequenceFile.R
@@ -82,7 +82,6 @@ NULL
 	consts["NAME"] <- "mapred.job.name"
 	consts["INPUT"] <- "mapred.input.dir"
 	consts["OUTPUT"] <- "mapred.output.dir"
-	
 	
 	ecor$consts <- consts
 	

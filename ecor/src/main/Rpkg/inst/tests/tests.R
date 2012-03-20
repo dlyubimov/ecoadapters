@@ -34,7 +34,6 @@ testSW <- function() {
 				sfw$close()
 			}
 			)
-
 	
 }
 
