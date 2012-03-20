@@ -11,18 +11,18 @@
 .proto.groupFromProto <- function (x) stop ("protobuf groups are not yet supported")
 
 .proto.msgFromProto <- function (msg, msgName, messageCatalog ) {
-	if ( length(message) ==  0 ) return(NULL)
+	if ( length(msg) ==  0 ) return(NULL)
 	
-	rd <- messageCatalog$descs[[msgName]]
+	rd <- messageCatalog$rdescs[[msgName]]
 	if ( length(rd)==0 ) 
 		stop (sprintf ("unable to find descriptor for submessage %s.", msgName))
 	
-	entries <- .jcall(message,"Ljava/util/Map;","getAllFields")
+	entries <- .jcall(msg,"Ljava/util/Map;","getAllFields")
 	entries <- .jcall(entries,"Ljava/util/Set;","entrySet")
 	fdmap <- as.list(entries)
 	
 	fnames <- character(0)
-	rmsg <- lapply(fdmap, function (x) {
+	rmsg <- lapply(fdmap, function (entry) {
 				fd <- .jcall(entry, "Ljava/lang/Object;", "getKey")
 				fname <- .jcall(fd, "Ljava/lang/String;","getName",simplify=T)
 				
@@ -31,13 +31,13 @@
 				if ( length(rfd)==0 )
 					stop (sprintf( "unable to find field %s in message %s.", fname,msgName))
 				
-				fnames <- c(fnames, fname)
+				fnames <<- c(fnames, fname)
 				value <- .jcall(entry, "Ljava/lang/Object;", "getValue")
 				
-				if ( ! rdf$isRepeated )
+				if ( ! rfd$isRepeated )
 					rfd$fieldFromProto(value)
 				else 
-					lapply(as.list(value),function(x) rfd$FieldFromProto(x))
+					lapply(as.list(value),function(x) rfd$fieldFromProto(x))
 			})
 	names(rmsg) <- fnames
 	rmsg
@@ -57,6 +57,7 @@
 .proto.groupToProto <- function (x) stop ("protobuf groups are not yet supported")
 
 .proto.msgToProto <- function (x, msgName, messageCatalog ) {
+	
 	if ( length(x) == 0 && mode(x) != "list" ) # null proposition 
 		return (NULL)
 	
@@ -71,25 +72,25 @@
 			"newBuilder", jd)
 	
 	lapply( names(x), function (fname ) {
-				rfd <- rd$rdescs[[fname]]
+				rfd <- rd[[fname]]
 				if ( length (rfd)==0 ) 
 					stop (sprintf ("Unable to find mapping for field %s.",fname))
 				
-				fd <- rfd$jfd
+				jfd <- rfd$jfd
 				
 				if ( rfd$isRepeated ) {
 					sapply(x[[fname]], function(x) 
 								.jcall(bldr,
 										"Lcom/google/protobuf/DynamicMessage$Builder;",
 										"addRepeatedField", 
-										fd, 
+										jfd, 
 										.jcast(rfd$fieldToProto(x),"java.lang.Object") ))
 				} else { 
 					v <- rfd$fieldToProto(x[[fname]])
 					if ( length(v) > 0 ) .jcall(bldr,
 								"Lcom/google/protobuf/DynamicMessage$Builder;",
 								"setField",
-								fd, 
+								jfd, 
 								.jcast(v,"java.lang.Object"))
 				}
 				NA
@@ -105,6 +106,7 @@ initialize.DescCatalog <- function (jdesc) {
 }
 
 analyzeDesc.DescCatalog <- function ( jdesc ) {
+	
 	msgName <- .jsimplify(.jcall(jdesc,"S","getFullName"))
 	
 	if ( length( descs[[msgName]] )==1 ) 
@@ -112,18 +114,18 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 	
 	
 	# walk the jdesc
-	fields <- as.list(.jcall(jdesc,"java.util.List"))
-	names <- character(0)
+	fields <- as.list(.jcall(jdesc,"Ljava/util/List;","getFields"))
+	rfnames <- character(0)
 	rfields <-
 			lapply(fields,function(fd) {
 						rfd <- list()
 						rfd$name <- .jsimplify(.jcall(fd,"S","getName"))
-						rfd$jfd <- fd
-						rfd$isRepeated <- .jsimplify(.jcall(fd,"B","isRepeated"))
+						rfd$jfd <- .jcast(fd,"com.google.protobuf.Descriptors$FieldDescriptor")
+						rfd$isRepeated <- .jsimplify(.jcall(fd,"Z","isRepeated"))
 						protoType <- .jcall(fd,"Lcom/google/protobuf/Descriptors$FieldDescriptor$Type;","getType")
 						protoType <- .jcall(protoType,"S","name")
 						rfd$type <- protoType
-						names <- c(names,rfd$name)
+						rfnames <<- c(rfnames,rfd$name)
 						
 						rfd$fieldFromProto <- switch(protoType,
 								
@@ -143,10 +145,10 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 								STRING = .proto.scalarFromProto,
 								UINT32 = .proto.scalarFromProto,
 								UINT64 = .proto.scalarFromProto,
-								MESSAGE = function (x) {
+								MESSAGE = {
 									d <- .jcall(fd,"Lcom/google/protobuf/Descriptors$Descriptor;","getMessageType")
 									smsgName <- analyzeDesc(d)
-									.proto.msgFromProto (x,smsgName, .self) 
+									function(x) .proto.msgFromProto (x,smsgName, .self) 
 								},
 								
 								GROUP = .proto.groupFromProto,
@@ -173,10 +175,14 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 								STRING = .proto.stringToProto,
 								UINT32 = .proto.int32ToProto,
 								UINT64 = .proto.int64ToProto,
-								MESSAGE = function (x) {
+								MESSAGE = {
 									d <- .jcall(fd,"Lcom/google/protobuf/Descriptors$Descriptor;","getMessageType")
-									smsgname <- analyzeDesc (d)
-									.proto.msgToProto(x,smsgName, .self)
+									smsgName <- analyzeDesc (d)
+									function(x)	.jcall(
+												.proto.msgToProto(x,smsgName, .self),
+												"Lcom/google/protobuf/Message;",
+												"build")
+									
 								},
 								
 								GROUP = .proto.groupToProto,
@@ -185,10 +191,10 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 						)
 						rfd
 					})
-	names(rfields) <- names
+	names(rfields) <- rfnames
 	
-	rdescs[[msgName]] <- rfields
-	descs[[msgName]] <- jdesc
+	rdescs[[msgName]] <<- rfields
+	descs[[msgName]] <<- jdesc
 	
 	msgName
 	
@@ -197,8 +203,8 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 proto.DescCatalog <- setRefClass("DescCatalog",
 		fields=c("descs", "rdescs", "outerMsg"),
 		methods=list(
-				initialize <- initialize.DescCatalog,
-				analyzeDesc <- analyzeDesc.DescCatalog
+				initialize = initialize.DescCatalog,
+				analyzeDesc = analyzeDesc.DescCatalog
 		))
 
 # map all messages in descriptor into R5 class
@@ -225,11 +231,19 @@ proto.desc <- function (descriptorUrl ) {
 	
 	## pull the information from descriptor into R structures 
 	## in order to avoid making java calls later
-	proto.DescCatalog$new(jdesc )
+	proto.DescCatalog$new(jdesc)
 }
 
-proto.fromProtoRaw <- function (x, descCatalog) NULL
-proto.fromProtoMsg <- function (x, descCatalog) NULL
-proto.toProtoBldr <- function (x, descCatalog) NULL
-proto.toProtoMsg <- function (x, descCatalog) NULL
-proto.toProtoRaw <- function (x, descCatalog) NULL
+proto.fromProtoRaw <- function (x, descCatalog) { 
+	msg <- .jcall("com.google.protobuf.DynamicMessage",
+			"Lcom/google/protobuf/DynamicMessage;",
+			"parseFrom",
+			descCatalog$descs[[descCatalog$outerMsg ]],
+			as.raw(x))
+	.proto.msgFromProto(msg, descCatalog$outerMsg, descCatalog )
+}
+proto.fromProtoMsg <- function (x, descCatalog) .proto.msgFromProto(x, descCatalog$outerMsg, descCatalog )
+proto.toProtoBldr <- function (x, descCatalog) .proto.msgToProto(x,descCatalog$outerMsg, descCatalog)
+proto.toProtoMsg <- function (x, descCatalog) .jcall(proto.toProtoBldr(x,descCatalog),"Lcom/google/protobuf/DynamicMessage;","build")
+proto.toProtoRaw <- function (x, descCatalog) .jcall(proto.toProtoMsg(x,descCatalog),"[B","toByteArray",evalArray=T)
+

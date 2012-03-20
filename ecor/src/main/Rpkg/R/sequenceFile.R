@@ -28,16 +28,21 @@ write.BytesWritable <- function(x) {
 }
 
 initialize.ProtoWritable <- function ( protoDesc ) { 
-	callSuper();
+	setJClass(J("org.apache.hadoop.io.BytesWritable"))
 	protodesc <<- protoDesc(protoDesc)
 }
 
 read.ProtoWritable <- function() 
-	proto.fromProtoRaw(callSuper(), protodesc)
+	proto.fromProtoRaw(jwritable$getBytes()[1:jwritable$getLength()], protodesc)
 
-write.ProtoWritable <- function ( rlist ) 
-	callSuper(proto.toProtoRaw(rlist,protodesc))
-
+write.ProtoWritable <- function ( rlist ) { 
+	x <- proto.toProtoRaw(rlist,protodesc)
+	len <- length(x)
+	x <- if (len == 0  ) .jnull("[B") else .jarray(as.raw(x)) 
+	
+#jwritable$set(.jarray(as.raw(x)),0,length(x)-1)
+	.jcall(jwritable,"V","set", x, 0, len-1 )
+}
 
 
 
@@ -160,7 +165,7 @@ ecor.BytesWritable <- setRefClass("BytesWritable",contains="Writable",
 				write=write.BytesWritable
 		))
 
-ecor.ProtoWritable <- setRefClass("ProtoWritable", contains="BytesWritable",
+ecor.ProtoWritable <- setRefClass("ProtoWritable", contains="Writable",
 		fields = c("protodesc"),
 		methods = list (
 				initialize=initialize.ProtoWritable,
