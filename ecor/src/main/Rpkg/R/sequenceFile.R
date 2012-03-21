@@ -29,7 +29,7 @@ write.BytesWritable <- function(x) {
 
 initialize.ProtoWritable <- function ( protoDesc ) { 
 	setJClass(J("org.apache.hadoop.io.BytesWritable"))
-	protodesc <<- protoDesc(protoDesc)
+	protodesc <<- proto.desc(protoDesc)
 }
 
 read.ProtoWritable <- function() 
@@ -40,8 +40,7 @@ write.ProtoWritable <- function ( rlist ) {
 	len <- length(x)
 	x <- if (len == 0  ) .jnull("[B") else .jarray(as.raw(x)) 
 	
-#jwritable$set(.jarray(as.raw(x)),0,length(x)-1)
-	.jcall(jwritable,"V","set", x, 0, len-1 )
+	.jcall(jwritable,"V","set", x, 0L, len - 1L)
 }
 
 
@@ -104,33 +103,33 @@ append.SequenceFileW <- function (key,value) {
 	vw <- .jcast(valw$jwritable, "org.apache.hadoop.io.Writable")
 	
 	# use "vectorized" version if arrays supplied.
-	if ( length(key)!= 1 || length(value) != 1 ) {
-		df <- data.frame(key=key, value=value, stringsAsFactors=F)
-		sapply(1:nrow(df), function(x) {
-
-					# this is still pretty slow. 
-					# but more tolerable at this point. 
-					# we may have to wrap it all in a single java-side 
-					# helper call later.
-					
-					
-					keyw$write(df[x,"key"])
-					valw$write(df[x,"value"])
-					
-					#slow!
-					#jw$append(keyw$jwritable, valw$jwritable )
-					
-					.jcall(jw,"V","append", kw,vw)
-				})
-		NULL
-	} else { 
+#	if ( length(key)!= 1 || length(value) != 1 ) {
+#		df <- data.frame(key=key, value=value, stringsAsFactors=F)
+#		sapply(1:nrow(df), function(x) {
+#
+#					# this is still pretty slow. 
+#					# but more tolerable at this point. 
+#					# we may have to wrap it all in a single java-side 
+#					# helper call later.
+#					
+#					
+#					keyw$write(df[x,"key"])
+#					valw$write(df[x,"value"])
+#					
+#					#slow!
+#					#jw$append(keyw$jwritable, valw$jwritable )
+#					
+#					.jcall(jw,"V","append", kw,vw)
+#				})
+#		NULL
+#	} else { 
 		keyw$write(key)
 		valw$write(value)
 		
 		# slow!!!
 		# jw$append(keyw$jwritable, valw$jwritable )
 		.jcall(jw,"V","append",kw,vw)
-	}
+#	}
 }
 
 close.SequenceFileW <- function()  
