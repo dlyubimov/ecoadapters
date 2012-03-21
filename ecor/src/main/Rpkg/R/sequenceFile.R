@@ -3,6 +3,7 @@
 setJClass.Writable <- function (jClass ) {
 	jwClass<<-jClass
 	jwritable <<- new(jClass)
+	jcastwritable <<- .jcast(jwritable, "org.apache.hadoop.io.Writable")
 }
 
 
@@ -99,8 +100,8 @@ append.SequenceFileW <- function (key,value) {
 	
 	if (isClosed) stop ("attempt to write to a closed writer.")
 
-	kw <- .jcast(keyw$jwritable, "org.apache.hadoop.io.Writable")
-	vw <- .jcast(valw$jwritable, "org.apache.hadoop.io.Writable")
+	kw <- keyw$jcastwritable
+	vw <- valw$jcastwritable
 	
 	# use "vectorized" version if arrays supplied.
 #	if ( length(key)!= 1 || length(value) != 1 ) {
@@ -142,7 +143,7 @@ close.SequenceFileW <- function()
 ###############
 
 ecor.Writable <- setRefClass("Writable", 
-		fields=c("jwritable", "jwClass" ),
+		fields=c("jwritable", "jwClass", "jcastwritable" ),
 		methods=list(
 				setJClass=setJClass.Writable,
 				write=function(x) NULL, 

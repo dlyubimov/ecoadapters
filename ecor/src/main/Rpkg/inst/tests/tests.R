@@ -58,8 +58,13 @@ test2 <- function () {
 	p <- proto.toProtoBldr( rmsg, d )
 	p <- proto.toProtoRaw( rmsg, d)
 	
+	system.time({for (i in 1:1000) p <- proto.toProtoRaw( rmsg, d)})
+	
 	rl <- proto.fromProtoRaw(p,d)
-  p1 <- proto.toProtoRaw(rl,d)
+
+	system.time({for (i in 1:1000)  rl <- proto.fromProtoRaw(p,d)})
+	
+	p1 <- proto.toProtoRaw(rl,d)
 
   #	expect_that(rawToChar(rl$idbuff),equals('012345566'))
 #	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a string'))

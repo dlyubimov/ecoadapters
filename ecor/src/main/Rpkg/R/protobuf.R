@@ -71,7 +71,8 @@
 			"Lcom/google/protobuf/DynamicMessage$Builder;",
 			"newBuilder", jd)
 	
-	lapply( names(x), function (fname ) {
+	for ( fname in names(x) ) {
+				xval <- x[[fname]]
 				rfd <- rd[[fname]]
 				if ( length (rfd)==0 ) 
 					stop (sprintf ("Unable to find mapping for field %s.",fname))
@@ -79,22 +80,22 @@
 				jfd <- rfd$jfd
 				
 				if ( rfd$isRepeated ) {
-					sapply(x[[fname]], function(x) 
+					
+					for (xitem in xval )
 								.jcall(bldr,
 										"Lcom/google/protobuf/DynamicMessage$Builder;",
 										"addRepeatedField", 
 										jfd, 
-										.jcast(rfd$fieldToProto(x),"java.lang.Object") ))
+										.jcast(rfd$fieldToProto(xitem),"java.lang.Object") )
 				} else { 
-					v <- rfd$fieldToProto(x[[fname]])
+					v <- rfd$fieldToProto(xval)
 					if ( length(v) > 0 ) .jcall(bldr,
 								"Lcom/google/protobuf/DynamicMessage$Builder;",
 								"setField",
 								jfd, 
 								.jcast(v,"java.lang.Object"))
 				}
-				NA
-			})
+			}
 	bldr
 }
 
@@ -207,16 +208,16 @@ proto.DescCatalog <- setRefClass("DescCatalog",
 				analyzeDesc = analyzeDesc.DescCatalog
 		))
 
-# map all messages in descriptor into R5 class
-# 
-# load, parse descriptor information into R5 catalog 
-# object (DescCatalog class)
-# 
-# @param descriptorUrl descriptor URL specified same 
-# way as in other types of adapters: either hdfs url 
-# pointing to proto descriptor file with outer message specification
-# or the generated message classname itself
-# 
+#' map all messages in descriptor into R5 class
+#' 
+#' load, parse descriptor information into R5 catalog 
+#' object (DescCatalog class)
+#' 
+#' @param descriptorUrl descriptor URL specified same 
+#' way as in other types of adapters: either hdfs url 
+#' pointing to proto descriptor file with outer message specification
+#' or the generated message classname itself
+#' 
 proto.desc <- function (descriptorUrl ) { 
 	u <- as.character(descriptorUrl)
 	
@@ -234,6 +235,17 @@ proto.desc <- function (descriptorUrl ) {
 	proto.DescCatalog$new(jdesc)
 }
 
+#' Convert entire message to R list 
+#' 
+#' Convert entire message to R list. list names correspond to field names in the 
+#' original proto descriptor. 
+#' 
+#' Note: this has been somewhat underperforming way of doing this. Proxy instances 
+#' may be actually much faster since they convert fields lazily in case one doesn't need 
+#' the entire stuff.
+#' 
+#' @param x The raw serialized proto message 
+#' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}. 
 proto.fromProtoRaw <- function (x, descCatalog) { 
 	msg <- .jcall("com.google.protobuf.DynamicMessage",
 			"Lcom/google/protobuf/DynamicMessage;",
@@ -242,8 +254,43 @@ proto.fromProtoRaw <- function (x, descCatalog) {
 			as.raw(x))
 	.proto.msgFromProto(msg, descCatalog$outerMsg, descCatalog )
 }
+
+#' Convert entire proto message to R list 
+#' 
+#' Convert entire message to R list. list names correspond to field names in the 
+#' original proto descriptor. 
+#' 
+#' Note: this has been somewhat underperforming way of doing this. Proxy instances 
+#' may be actually much faster since they convert fields lazily in case one doesn't need 
+#' the entire stuff.
+#' 
+#' @param x The rJava object message reference ( \code{com.google.protobuf.Message} instance)
+#' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}.
+#' @return rJava instance 
 proto.fromProtoMsg <- function (x, descCatalog) .proto.msgFromProto(x, descCatalog$outerMsg, descCatalog )
+
+#' Convert R list to proto builder 
+#' 
+#' Convert entire R list message to proto message builder (rJava instance of com.google.protobuf.DynamicMessage$Builder).
+#' 
+#' @param x the R list instance where subscripts are considered to be message attributes.
+#' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}. 
+#' @return rJava instance 
 proto.toProtoBldr <- function (x, descCatalog) .proto.msgToProto(x,descCatalog$outerMsg, descCatalog)
+#' Convert R list to proto message 
+#' 
+#' Convert entire R list message to proto message (rJava instance of com.google.protobuf.DynamicMessage).
+#' 
+#' @param x the R list instance where subscripts are considered to be message attributes.
+#' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}.
+#' @return rJava instance 
 proto.toProtoMsg <- function (x, descCatalog) .jcall(proto.toProtoBldr(x,descCatalog),"Lcom/google/protobuf/DynamicMessage;","build")
+#' Convert R list to proto message 
+#' 
+#' Convert entire R list message to proto message (rJava instance of com.google.protobuf.DynamicMessage).
+#' 
+#' @param x the R list instance where subscripts are considered to be message attributes.
+#' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}.
+#' @return rJava instance 
 proto.toProtoRaw <- function (x, descCatalog) .jcall(proto.toProtoMsg(x,descCatalog),"[B","toByteArray",evalArray=T)
 
