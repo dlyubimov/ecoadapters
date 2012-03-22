@@ -4,4 +4,4 @@
 
 MVN='mvn clean install -DskipTests -DR'
 
-sudo R CMD REMOVE ecor; { $MVN && sudo HADOOP_HOME=$HADOOP_HOME R CMD INSTALL --build target/ecor-0.4.0-SNAPSHOT-rpkg; }
+sudo R CMD REMOVE ecor; { $MVN && sudo HADOOP_HOME=$HADOOP_HOME R_COMPILE_PKGS=1 R CMD INSTALL --build target/ecor-0.4.0-SNAPSHOT-rpkg; }

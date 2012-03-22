@@ -29,6 +29,7 @@ testSW <- function() {
 
 test2 <- function () {
   	library(ecor)
+	library(compiler)
 	
 	d <- proto.desc('com.inadco.ecoadapters.ecor.tests.codegen.Tests$EcorTest')
 
@@ -58,19 +59,35 @@ test2 <- function () {
 
 	p <- proto.toProtoBldr( rmsg, d )
 	praw <- proto.toProtoRaw( rmsg, d)
-	
-	system.time({for (i in 1:1000) p <- proto.toProtoRaw( rmsg, d)})
-	
 	rl <- proto.fromProtoRaw(praw,d)
+	
+	# will use as.list() coersion from a proxy form
+	lapply(rl, function(x) x)
+	
+	# perhaps better way without list coersion 
+	# and still conversion on demand
+	lapply(names(rl), function(x) rl[[x]] )
+
+	# and now back again to byte array
+	p1 <- proto.toProtoRaw(rl,d)
+	
+	
+	system.time({for (i in 1:1000) praw <- proto.toProtoRaw( rmsg, d)})
+	
 
 	system.time({for (i in 1:1000)  rl <- proto.fromProtoRaw(praw,d)})
+	system.time({for (i in 1:1000)  rl <- proto.fromProtoRaw(praw,d,F)})
 	
-	#
-	proxy <-proto.ProtoProxy(d,praw)
-	proxy$idbuff
-	proxy[["idbuff"]]
+	e <- compile(for (i in 1:1000)  rl <- proto.fromProtoRaw(praw,d))
+	system.time(eval(e))
+
+	e <- compile(for (i in 1:1000)  rl <- proto.fromProtoRaw(praw,d,F))
+	system.time(eval(e))
 	
-	p1 <- proto.toProtoRaw(rl,d)
+	
+	names(rl)
+	class(rl)
+	
 
   #	expect_that(rawToChar(rl$idbuff),equals('012345566'))
 #	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a string'))

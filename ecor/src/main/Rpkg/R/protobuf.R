@@ -3,14 +3,14 @@
 # assumes jvm already initialized by the package. 
 #
 
-.proto.enumFromProto <- function (x) .jcall(x,"S","toString")
-.proto.scalarFromProto <- function (x) .jsimplify(x)
-.proto.bytesFromProto <- function (x) .jcall(x,"[B","toByteArray",evalArray=T)
-.proto.doubleFromProto <- function(x) .jcall(x,"D","doubleValue")
+.proto.enumFromProto <- function (x,...) .jcall(x,"S","toString")
+.proto.scalarFromProto <- function (x,...) .jsimplify(x)
+.proto.bytesFromProto <- function (x,...) .jcall(x,"[B","toByteArray",evalArray=T)
+.proto.doubleFromProto <- function(x,...) .jcall(x,"D","doubleValue")
 .proto.floatFromProto <- .proto.doubleFromProto
-.proto.groupFromProto <- function (x) stop ("protobuf groups are not yet supported")
+.proto.groupFromProto <- function (x,...) stop ("protobuf groups are not yet supported")
 
-.proto.msgFromProto <- function (msg, msgName, messageCatalog ) {
+.proto.msgFromProto <- function (msg, msgName, messageCatalog, ... ) {
 	if ( length(msg) ==  0 ) return(NULL)
 	
 	rd <- messageCatalog$rdescs[[msgName]]
@@ -34,10 +34,12 @@
 				fnames <<- c(fnames, fname)
 				value <- .jcall(entry, "Ljava/lang/Object;", "getValue")
 				
+				fconv <- rfd$fieldFromProto
+				
 				if ( ! rfd$isRepeated )
-					rfd$fieldFromProto(value)
+					fconv(value, use.proxy = F )
 				else 
-					lapply(as.list(value),function(x) rfd$fieldFromProto(x))
+					lapply(as.list(value), function(x) fconv(x, use.proxy = F ))
 			})
 	names(rmsg) <- fnames
 	rmsg
@@ -149,7 +151,11 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 								MESSAGE = {
 									d <- .jcall(fd,"Lcom/google/protobuf/Descriptors$Descriptor;","getMessageType")
 									smsgName <- analyzeDesc(d)
-									function(x) .proto.msgFromProto (x,smsgName, .self) 
+									
+									function(x, use.proxy=T, ... ) 
+										switch (as.integer(use.proxy)+1, 	
+												.proto.msgFromProto (x, smsgName, .self ),
+												.proto.ProtoProxy(.self, jmsg=x, msgName=smsgName ))
 								},
 								
 								GROUP = .proto.groupFromProto,
@@ -180,7 +186,7 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 									d <- .jcall(fd,"Lcom/google/protobuf/Descriptors$Descriptor;","getMessageType")
 									smsgName <- analyzeDesc (d)
 									function(x)	.jcall(
-												.proto.msgToProto(x,smsgName, .self),
+												.proto.msgToProto(x, smsgName, .self ),
 												"Lcom/google/protobuf/Message;",
 												"build")
 									
@@ -212,7 +218,7 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 #' 
 #' either jmsgRaw or jmsg should be supplied, but not both. 
 #' 
-proto.ProtoProxy <- function ( descCatalog, jmsgRaw = NULL, jmsg=NULL, msgName = NULL ) {
+.proto.ProtoProxy <- function ( descCatalog, jmsgRaw = NULL, jmsg=NULL, msgName = NULL ) {
 	
 	if ( mode(descCatalog) != "S4" ||
 			descCatalog@class != "DescCatalog")
@@ -230,8 +236,9 @@ proto.ProtoProxy <- function ( descCatalog, jmsgRaw = NULL, jmsg=NULL, msgName =
 	
 	else { 
 		if (mode(jmsg) != "S4" || 
-				jmsg@jclass != "com/google/protobuf/DynamicMessage" )
-			stop ( "Wrong jmsg parameter. Must be rJava ref object for com.google.protobuf.DynamicMessage.")
+				!any(jmsg@jclass == c("java/lang/Object", "com/google/protobuf/DynamicMessage" )))
+			stop ( sprintf( "Wrong jmsg parameter. Must be rJava ref object for com.google.protobuf.DynamicMessage, but got %s",
+							jmsg@jclass))
 	}
 	
 	self <- list()
@@ -245,15 +252,57 @@ proto.ProtoProxy <- function ( descCatalog, jmsgRaw = NULL, jmsg=NULL, msgName =
     self
 }
 
+#' @export 
 "$.ProtoProxy" <- function (self, subscript) {
 	f<- subscript.ProtoProxy
 	environment(f) <- unclass(self)$e
 	f(subscript)
 }
+#' @export 
+"$<-.ProtoProxy" <- function (self, subscript, value) { 
+	stop ("proto messages are immutable, cannot assign.")
+}
+
+#' @export 
+"[[.ProtoProxy" <- `$.ProtoProxy`
+#' @export 
+"[[<-.ProtoProxy" <- `$<-.ProtoProxy`
+
+#' @export 
+names.ProtoProxy <- function (x) { 
+	e <- unclass(x)$e
+	rd <- e$desc$rdescs[[e$msgName]]
+	names(rd)
+}
+
+#' @export 
+`names<-.ProtoProxy` <- function (self, value)  {
+	stop ("proto proxy descriptors are immutable, cannot change message schema.")
+}
+#' coersion to an R list
+#' 
+#' Warning: not terribly efficient. Lazy value cache is not used in this case. 
+#' Will cause non-lazy re-load of all attributes in the message in conversion to R values 
+#' recursively on the entire subtree.
+#' 
+#' If the goal to use {l,s}apply, 
+#' a better variance of this could be 
+#' \code{lapply(names(x) function (x) { x<- proxy[[x]] ... }) }
+#' to ensure not to re-convert all values not yet in cache.
+#' 
+#' Another way is to load the entire subtree without lazy proxy in the first place by 
+#' means of \link{proto.fromProtoXXX(..., use.proxy=F}
+#' 
+#' @export 
+as.list.ProtoProxy <- function (self) { 
+	e <- unclass(self)$e
+	.proto.msgFromProto(e$jmsg, e$msgName, e$desc, use.proxy=F )
+}
 
 subscript.ProtoProxy <- function ( subscript ) {
 
-	r <- valcache[[subscript]]
+	r<- valcache[[subscript]]
+	
 	if ( length(r) > 0 ) return (r)
 	if ( !is.na(nullcache[subscript])) return(NULL)
 	
@@ -269,15 +318,11 @@ subscript.ProtoProxy <- function ( subscript ) {
 	
 	x <- .jcall(jmsg,"Ljava/lang/Object;","getField", rfd$jfd )
 	
-	rval <-	if ( ! rfd$isRepeated ) {
-				# todo: if this is a message, 
-				# we actually need to replace existing 
-				# strategy with a strategy that creates new instance of 
-				# ProtoProxy.
-				rfd$fieldFromProto(x)
-			} else { 
-				lapply(as.list(x),function(xitem) rfd$fieldFromProto(xitem))
-			}
+	rval <-	if ( ! rfd$isRepeated ) 
+				rfd$fieldFromProto(x, use.proxy=T)
+			else  
+				lapply(as.list(x),function(xitem) rfd$fieldFromProto(xitem, use.proxy=T))
+			
 	
 	if ( length(rval)==0 )  
 		nullcache[subscript] <<- T
@@ -342,13 +387,15 @@ proto.desc <- function (descriptorUrl ) {
 #' 
 #' @param x The raw serialized proto message 
 #' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}. 
-proto.fromProtoRaw <- function (x, descCatalog) { 
+proto.fromProtoRaw <- function (x, descCatalog, use.proxy = T) { 
 	msg <- .jcall("com.google.protobuf.DynamicMessage",
 			"Lcom/google/protobuf/DynamicMessage;",
 			"parseFrom",
 			descCatalog$descs[[descCatalog$outerMsg ]],
 			as.raw(x))
-	.proto.msgFromProto(msg, descCatalog$outerMsg, descCatalog )
+	switch (as.integer(use.proxy)+1, 	
+			.proto.msgFromProto(msg, descCatalog$outerMsg, descCatalog ),
+			.proto.ProtoProxy(descCatalog, jmsg = msg))	
 }
 
 #' Convert entire proto message to R list 
@@ -363,7 +410,7 @@ proto.fromProtoRaw <- function (x, descCatalog) {
 #' @param x The rJava object message reference ( \code{com.google.protobuf.Message} instance)
 #' @param descCatalog the protobuf message descriptor catalog obtained via \link{proto.desc}.
 #' @return rJava instance 
-proto.fromProtoMsg <- function (x, descCatalog) .proto.msgFromProto(x, descCatalog$outerMsg, descCatalog )
+proto.fromProtoMsg <- function (x, descCatalog, use.proxy=T ) .proto.msgFromProto(x, descCatalog$outerMsg, descCatalog, use.proxy )
 
 #' Convert R list to proto builder 
 #' 
