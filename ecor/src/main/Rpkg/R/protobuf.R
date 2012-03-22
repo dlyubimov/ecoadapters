@@ -201,12 +201,108 @@ analyzeDesc.DescCatalog <- function ( jdesc ) {
 	
 }
 
+###############
+# ProtoProxy methods. 
+# we use S3 class for ProtoProxy 
+# instead of R5 because R5 doesn't seem 
+# to allow to meaningfully override $ and [[.
+###############
+
+#' initialize ProtoProxy instance
+#' 
+#' either jmsgRaw or jmsg should be supplied, but not both. 
+#' 
+proto.ProtoProxy <- function ( descCatalog, jmsgRaw = NULL, jmsg=NULL, msgName = NULL ) {
+	
+	if ( mode(descCatalog) != "S4" ||
+			descCatalog@class != "DescCatalog")
+		stop ("invalid descCatalog parameter. Must be R5 instance of DescCatalog class.")
+	
+	if ( length(msgName )==0 )
+		msgName <- descCatalog$outerMsg
+	
+	if ( length(jmsg)==0)
+		jmsg <- .jcall("com.google.protobuf.DynamicMessage",
+				"Lcom/google/protobuf/DynamicMessage;",
+				"parseFrom",
+				descCatalog$descs[[msgName ]],
+				as.raw(jmsgRaw))
+	
+	else { 
+		if (mode(jmsg) != "S4" || 
+				jmsg@jclass != "com/google/protobuf/DynamicMessage" )
+			stop ( "Wrong jmsg parameter. Must be rJava ref object for com.google.protobuf.DynamicMessage.")
+	}
+	
+	self <- list()
+	self$e <- new.env()
+	self$e$jmsg <- jmsg
+	self$e$desc <- descCatalog
+	self$e$msgName <- msgName 
+	self$e$valcache <- list()
+	self$e$nullcache <- logical(0)
+	class(self) <- "ProtoProxy"
+    self
+}
+
+"$.ProtoProxy" <- function (self, subscript) {
+	f<- subscript.ProtoProxy
+	environment(f) <- unclass(self)$e
+	f(subscript)
+}
+
+subscript.ProtoProxy <- function ( subscript ) {
+
+	r <- valcache[[subscript]]
+	if ( length(r) > 0 ) return (r)
+	if ( !is.na(nullcache[subscript])) return(NULL)
+	
+	# lazy fetch: 
+	rd <- desc$rdescs[[msgName]]
+	if ( length(rd)==0 ) 
+		stop (sprintf ("unable to find descriptor for submessage %s.", msgName))
+	
+	rfd <- rd[[subscript]]
+	
+	if ( length(rfd) ==0) 
+		stop (sprintf("unable to find field descriptor for proto attribute %s.",subscript))
+	
+	x <- .jcall(jmsg,"Ljava/lang/Object;","getField", rfd$jfd )
+	
+	rval <-	if ( ! rfd$isRepeated ) {
+				# todo: if this is a message, 
+				# we actually need to replace existing 
+				# strategy with a strategy that creates new instance of 
+				# ProtoProxy.
+				rfd$fieldFromProto(x)
+			} else { 
+				lapply(as.list(x),function(xitem) rfd$fieldFromProto(xitem))
+			}
+	
+	if ( length(rval)==0 )  
+		nullcache[subscript] <<- T
+	else 
+		valcache[[subscript]] <<- rval
+	
+	rval
+}
+
+#`[[.ProtoProxy` <- function (proxy,subscript )  proxy$subscript(subscript)
+#`$.ProtoProxy` <- function (proxy, subscript ) proxy$subscript(subscript)
+
+
+
+#' DescCatalog (R5 class)
+#' 
+#' 
 proto.DescCatalog <- setRefClass("DescCatalog",
 		fields=c("descs", "rdescs", "outerMsg"),
 		methods=list(
 				initialize = initialize.DescCatalog,
 				analyzeDesc = analyzeDesc.DescCatalog
 		))
+
+
 
 #' map all messages in descriptor into R5 class
 #' 

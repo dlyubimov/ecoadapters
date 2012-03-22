@@ -28,7 +28,8 @@ testSW <- function() {
 }
 
 test2 <- function () {
-  library(ecor)
+  	library(ecor)
+	
 	d <- proto.desc('com.inadco.ecoadapters.ecor.tests.codegen.Tests$EcorTest')
 
 	rmsg <- list()
@@ -56,13 +57,18 @@ test2 <- function () {
   
 
 	p <- proto.toProtoBldr( rmsg, d )
-	p <- proto.toProtoRaw( rmsg, d)
+	praw <- proto.toProtoRaw( rmsg, d)
 	
 	system.time({for (i in 1:1000) p <- proto.toProtoRaw( rmsg, d)})
 	
-	rl <- proto.fromProtoRaw(p,d)
+	rl <- proto.fromProtoRaw(praw,d)
 
-	system.time({for (i in 1:1000)  rl <- proto.fromProtoRaw(p,d)})
+	system.time({for (i in 1:1000)  rl <- proto.fromProtoRaw(praw,d)})
+	
+	#
+	proxy <-proto.ProtoProxy(d,praw)
+	proxy$idbuff
+	proxy[["idbuff"]]
 	
 	p1 <- proto.toProtoRaw(rl,d)
 
