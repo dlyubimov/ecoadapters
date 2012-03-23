@@ -36,7 +36,7 @@ NULL
 	
 	if ( length(pkgname) == 0 ) pkgname <- "ecor"
 	
-	ecor <- list()
+	ecor <- new.env()
 	
 	hadoopcp <- ecor.hadoopClassPath()
 	
@@ -93,6 +93,10 @@ NULL
 #' 
 #' Discover hadoop classpath based on HADOOP_HOME environment variable.
 #' 
+#' Warning: this is very much ad-hoc and assumes current CDH 
+#' hadoop layout for hadoop libs. This probably needs to be 
+#' re-done according to the best practices for Hadoop stuff.
+#' 
 #' @author dmitriy
 ecor.hadoopClassPath <- function () {
 	hhome <- Sys.getenv("HADOOP_HOME")
@@ -127,6 +131,8 @@ ecor.hadoopClassPath <- function () {
 #' Produce local hbase path
 #' 
 #' Produce local hbase path
+#' 
+#' TODO: re-do per best practices, too
 #' 
 #' @author dmitriy
 ecor.hBaseClassPath <- function () {
@@ -186,31 +192,93 @@ ecor.pigClassPath <- function () {
 	c(piglib,pigcore)
 }
 
+#' initialize new HConf instance.
+#' 
+#' @method initialize HConf
+#' @param jconf rJava reference to \code{o.a.h.conf.Configuration}
+initialize.HConf <- function (jconf=NULL) {
+	iter <- jconf$iterator()
+	props <<- character(0)
+	if ( length(jconf)>0) 
+	while (iter$hasNext() ) { 
+		map.entry <- iter$`next`()
+		props[as.character(map.entry$getKey())] <<- as.character(map.entry$getValue())
+	}
+	props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
+	props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
+	props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
 
+}
+
+#' convert to rJava \code{o.a.h}
+#' 
+#' convert to rJava reference \code{o.a.h.conf.Configuration} instance, 
+#' also merge with the default hadoop configuration values.
+#' 
+#' @method as.jconf HConf
+as.jconf.HConf <- function () { 
+	jconf <- new (J("org.apache.hadoop.conf.Configuration"), ecor$jconf)
+	for ( n in names(props) )jconf$set(n,props[n])
+	jconf
+}
+
+#' set conf prop
+#' 
+#' @method set HConf
+set.HConf <- function (name, val) {
+	props[name] <<- val
+	NULL
+}
+
+#' get conf prop
+#' 
+#' @method get HConf
+get.HConf <- function (name) props[name]
+
+setInputFormat.HConf <- function(value) props[ecor$consts["INPUT_FORMAT"]] <<- value 
+getInputFormat.HConf <- function () props[ecor$consts["INPUT_FORMAT"]]
+setOutputFormat.HConf <- function( value) props[ecor$consts["OUTPUT_FORMAT"]] <<- value
+getOutputFormat.HConf <- function ( ) props[ecor$consts["OUTPUT_FORMAT"]]
+setMapper.HConf <- function(value) props[ecor$consts["MAP"]] <<- value
+getMapper.HConf <- function () props[ecor$consts["MAP"]]
+setReducer.HConf <- function (value) props[ecor$consts["REDUCE"]] <<- value
+getReducer.HConf <- function () props[ecor$consts["REDUCE"]]
+
+
+setInput.HConf <- function (value) props[ecor$consts["INPUT"]] <<- value
+getInput.HConf <- function () props[ecor$consts["INPUT"]]
+setOutput.HConf <- function(value) props[ecor$consts["OUTPUT"]] <<- value
+getOutput.HConf <- function () props[ecor$consts["OUTPUT"]]
+
+mrSubmit.HConf <- function (MAPFUN, REDUCEFUN=NULL) ecor.HJob$new(.self,MAPFUN, REDUCEFUN )
+
+#' R5 class holding MR configuration etc. stuff.
+#' 
+#' 
+ecor.HConf <- setRefClass("HConf", 
+		fields=list(props="list"),
+		methods=list(
+				initialize =initialize.HConf,
+				as.jconf =as.jconf.HConf,
+				set = set.HConf,
+				get = get.HConf,
+				setInputFormat = setInputFormat.HConf,
+				getInputFormat = getInputFormat.HConf,
+				setOutputFormat = setOutputFormat.HConf,
+				getOutputFormat = getOutputFormat.HConf,
+				setMapper = setMapper.HConf,
+				getMapper = getMapper.HConf,
+				setReducer = setReducer.HConf,
+				getReducer = getReducer.HConf,
+				setInput = setInput.HConf,
+				getInput = getInput.HConf,
+				mrSubmit = mrSubmit.HConfs
+				))
+		
 ##################################
 # generic MR job driver          #
 ##################################
 
-# convert hadoop Configuration to a 
-# character vector with string subscripts 
-# corresponding to prop names 
-# Configuration is Iterable<Map.Entry<String,String>>
-.ecor.jconf2hconf <- function (jconf) {
-	conf <- ecor.hconf()
-	iter <- jconf$iterator()
-	while (iter$hasNext() ) {
-		map.entry <- iter$"next"()
-		conf[as.character(map.entry$getKey())] <- as.character(map.entry$getValue())
-	}
-	conf
-}
-
-# convert character vector to configuration
-.ecor.hconf2jconf <- function (v ) {
-	jconf <- new (J("org.apache.hadoop.conf.Configuration"),ecor$jconf)
-	sapply(names(v), function(n) jconf$set(n,v[n]))
-	jconf
-}
 
 # convert string to Path 
 .ecor.jpath <- function(parent, child = NULL) {
@@ -226,17 +294,6 @@ ecor.pigClassPath <- function () {
 	J("org.apache.hadoop.fs.FileSystem")$getLocal(ecor$jconf)
 }
 
-ecor.hconf <- function() { 
-	a <- character(0); class(a) <- "hconf";
-	
-	# set some defaults 
-	ecor.map(a) <- "com.inadco.ecoadapters.r.RMapper"
-	ecor.inputFormat(a) <- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
-	ecor.outputFormat(a) <- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-	
-	a
-}
-
 .ecor.toB64 <- function(x) {
 	rawx <- serialize(x, NULL, ascii = F)
 	rawToChar(J("org.apache.commons.codec.binary.Base64")$encodeBase64(.jarray(rawx)))
@@ -246,44 +303,17 @@ ecor.hconf <- function() {
 	rx <- unserialize(rawx)
 }
 
-ecor.hjob <- function(x,...) UseMethod("hjob")
-"ecor.inputFormat<-" <- function(x,...) UseMethod("inputFormat<-")
-ecor.inputFormat <- function(x,...) UseMethod("inputFormat")
-"ecor.outputFormat<-" <- function(x,...) UseMethod("outputFormat<-")
-ecor.outputFormat <- function(x,...) UseMethod("outputFormat")
-"ecor.map<-" <- function(x,...) UseMethod("map<-")
-ecor.map <- function(x,...) UseMethod("map")
-"ecor.reduce<-" <- function(x,...) UseMethod("reduce<-")
-ecor.reduce <- function(x,...) UseMethod("reduce")
 
-"inputFormat<-.hconf" <- function(x, value) { x[ecor$consts["INPUT_FORMAT"]] <- value; x} 
-inputFormat.hconf <- function (x) x[ecor$consts["INPUT_FORMAT"]]
-"outputFormat<-.hconf" <- function(x, value) { x[ecor$consts["OTUPUT_FORMAT"]] <- value; x}
-outputFormat.hconf <- function (x ) x[ecor$consts["OUTPUT_FORMAT"]]
-"map<-.hconf" <- function(x, value) { x[ecor$consts["MAP"]] <- value; x }
-map.hconf <- function(x) x[ecor$consts["MAP"]]
-"reduce<-.hconf" <- function(x, value ) { x[ecor$consts["REDUCE"]] <- value; x }
-reduce.hconf <- function (x) x[ecor$consts["REDUCE"]]
-
-
-"ecor.input<-" <- function (x,...) UseMethod("input<-")
-ecor.input <- function (x,...) UseMethod("input")
-"ecor.output<-" <- function (x,...) UseMethod("output<-")
-ecor.output <- function (x,...) UseMethod("output")
-
-"input<-.hconf" <- function (x, value) { x[ecor$consts["INPUT"]] <- value; x}
-input.hconf <- function (x) x[ecor$consts["INPUT"]]
-"output<-.hconf" <- function(x,value) { x[ecor$consts["OUTPUT"]] <- value; x}
-output.hconf <- function (x) x[ecor$consts["OUTPUT"]]
 
 #actually create job handle and submit
-hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
+initialize.HJob <- function(hconf, MAPFUN, REDUCEFUN = NULL ) {
 	
 	if ( class(MAPFUN) != "function" )
 		stop ("mapper R function expected.")
+	if ( as.character(class(hconf))!="HConf")
+		stop ("hconf must be of HConf class.")
 	
-	
-	conf["ecor.NAMESPACES"] <- .ecor.toB64(loadedNamespaces())
+	hconf$set("ecor.NAMESPACES", .ecor.toB64(loadedNamespaces()))
 	
 	mapfunfilename <- tempfile()
 	f <- file(mapfunfilename, open="wb")
@@ -297,7 +327,7 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 	)
 	
 	tryCatch ({
-				conf["ecor.MAPFUN"] <- basename(mapfunfilename)
+				hconf$set("ecor.MAPFUN", basename(mapfunfilename))
 				
 				reducefunfilename <- NULL 
 				if ( length(REDUCEFUN) >0  ) {
@@ -312,7 +342,7 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 					conf["ecor.REDUCEFUN"] <- basename(reducefunfilename)
 				}
 				
-				jconf <- .ecor.hconf2jconf(conf)
+				jconf <- hconf$as.jconf()
 				
 				# broadcast tempfile containing environment
 				J("org.apache.hadoop.filecache.DistributedCache")$
@@ -324,7 +354,7 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 							addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localFS()),
 						simplify=T)
 				
-				hjob <- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
+				hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
 				hjob$submit() 
 				
 				file.remove(mapfunfilename)
@@ -338,10 +368,20 @@ hjob.hconf <- function(conf, MAPFUN, REDUCEFUN = NULL ) {
 				if ( length(reducefunfilename) > 0 ) file.remove(reducefunfilename)
 			}
 	)
-	
+}
+
+waitForCompletion.HJob <- function (verbose=F) {
+	hjob$waitForCompletion(verbose)
 }
 
 
+ecor.HJob <- setRefClass("HJob",
+		fields=list(hjob="S4"),
+		methods=list(
+				initialize=initialize.HJob,
+				waitForCompletion=waitForCompletion.HJob
+				)
+)
 
 ##################################
 # Generic mapper configuration   #

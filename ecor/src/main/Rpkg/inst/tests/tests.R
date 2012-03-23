@@ -127,4 +127,3 @@ test2 <- function () {
 context("prototests")
 test_that("protoconversions",test2())
 
-
