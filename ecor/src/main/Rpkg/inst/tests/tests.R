@@ -110,17 +110,16 @@ test2 <- function () {
 			}
 	)
   
-  hconf <- ecor.hconf()
-  ecor.input(hconf) <- infile
-  ecor.output(hconf) <- "/temp/rmr-out"
-  
   mapfun <- function ( key,value ) { 
     ecor.collect(key,value)
   }
   
+  hconf <- ecor.HConf$new()
+  hconf$setInput( infile )
+  hconf$setOutput("/temp/rmr-out")
   
-  hjob <- ecor.hjob(hconf, mapfun)
-  
+  hconf$setMapper(mapfun)
+  hjob <- hconf$mrSubmit(T)
 	
 }
 

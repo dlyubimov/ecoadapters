@@ -197,17 +197,19 @@ ecor.pigClassPath <- function () {
 #' @method initialize HConf
 #' @param jconf rJava reference to \code{o.a.h.conf.Configuration}
 initialize.HConf <- function (jconf=NULL) {
-	iter <- jconf$iterator()
-	props <<- character(0)
-	if ( length(jconf)>0) 
-	while (iter$hasNext() ) { 
-		map.entry <- iter$`next`()
-		props[as.character(map.entry$getKey())] <<- as.character(map.entry$getValue())
-	}
-	props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
-	props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
-	props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-
+  
+  props <<- character(0)
+  
+  if ( length(jconf)>0) {
+    iter <- jconf$iterator()
+    while (iter$hasNext() ) { 
+      map.entry <- iter$`next`()
+      props[as.character(map.entry$getKey())] <<- as.character(map.entry$getValue())
+    }
+  }
+  props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
+  props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
+  props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
 }
 
 #' convert to rJava \code{o.a.h}
@@ -239,10 +241,10 @@ setInputFormat.HConf <- function(value) props[ecor$consts["INPUT_FORMAT"]] <<- v
 getInputFormat.HConf <- function () props[ecor$consts["INPUT_FORMAT"]]
 setOutputFormat.HConf <- function( value) props[ecor$consts["OUTPUT_FORMAT"]] <<- value
 getOutputFormat.HConf <- function ( ) props[ecor$consts["OUTPUT_FORMAT"]]
-setMapper.HConf <- function(value) props[ecor$consts["MAP"]] <<- value
-getMapper.HConf <- function () props[ecor$consts["MAP"]]
-setReducer.HConf <- function (value) props[ecor$consts["REDUCE"]] <<- value
-getReducer.HConf <- function () props[ecor$consts["REDUCE"]]
+setMapper.HConf <- function(value) mapfun <<- value
+getMapper.HConf <- function () mapfun
+setReducer.HConf <- function (value) reducefun <<- value
+getReducer.HConf <- function () reducefun
 
 
 setInput.HConf <- function (value) props[ecor$consts["INPUT"]] <<- value
@@ -250,13 +252,13 @@ getInput.HConf <- function () props[ecor$consts["INPUT"]]
 setOutput.HConf <- function(value) props[ecor$consts["OUTPUT"]] <<- value
 getOutput.HConf <- function () props[ecor$consts["OUTPUT"]]
 
-mrSubmit.HConf <- function (MAPFUN, REDUCEFUN=NULL) ecor.HJob$new(.self,MAPFUN, REDUCEFUN )
+mrSubmit.HConf <- function (overwrite = F) ecor.HJob$new(.self, overwrite)
 
 #' R5 class holding MR configuration etc. stuff.
 #' 
 #' 
 ecor.HConf <- setRefClass("HConf", 
-		fields=list(props="list"),
+		fields=list(props="character",mapfun="function",reducefun="function"),
 		methods=list(
 				initialize =initialize.HConf,
 				as.jconf =as.jconf.HConf,
@@ -272,6 +274,8 @@ ecor.HConf <- setRefClass("HConf",
 				getReducer = getReducer.HConf,
 				setInput = setInput.HConf,
 				getInput = getInput.HConf,
+        setOutput = setOutput.HConf,
+        getOutput = getOutput.HConf,
 				mrSubmit = mrSubmit.HConf
 				))
 		
@@ -294,6 +298,10 @@ ecor.HConf <- setRefClass("HConf",
 	J("org.apache.hadoop.fs.FileSystem")$getLocal(ecor$jconf)
 }
 
+#dfs
+.ecor.fs <- function () 
+  J("org.apache.hadoop/fs.FileSystem")$get(ecor$jconf)
+
 .ecor.toB64 <- function(x) {
 	rawx <- serialize(x, NULL, ascii = F)
 	rawToChar(J("org.apache.commons.codec.binary.Base64")$encodeBase64(.jarray(rawx)))
@@ -306,68 +314,86 @@ ecor.HConf <- setRefClass("HConf",
 
 
 #actually create job handle and submit
-initialize.HJob <- function(hconf, MAPFUN, REDUCEFUN = NULL ) {
-	
-	if ( class(MAPFUN) != "function" )
-		stop ("mapper R function expected.")
-	if ( as.character(class(hconf))!="HConf")
-		stop ("hconf must be of HConf class.")
-	
-	hconf$set("ecor.NAMESPACES", .ecor.toB64(loadedNamespaces()))
-	
-	mapfunfilename <- tempfile()
-	f <- file(mapfunfilename, open="wb")
-	tryCatch({
-				# my tests seem to indicate 
-				# that this serializes all the function 
-				# environment too.
-				serialize(MAPFUN, f, ascii = F)
-			},
-			finally = close(f)
-	)
-	
-	tryCatch ({
-				hconf$set("ecor.MAPFUN", basename(mapfunfilename))
-				
-				reducefunfilename <- NULL 
-				if ( length(REDUCEFUN) >0  ) {
-					reducefunfilename <- tempfile()
-					f <- file(reducefunfilename, open="wb")
-					tryCatch({
-								serialize(REDUCEFUN,f,ascii = F)
-							},
-							finally = {
-								close(f)
-							})
-					conf["ecor.REDUCEFUN"] <- basename(reducefunfilename)
-				}
-				
-				jconf <- hconf$as.jconf()
-				
-				# broadcast tempfile containing environment
-				J("org.apache.hadoop.filecache.DistributedCache")$
-				addCacheFile( new(J("java.net.URI"),mapfunfilename), jconf)
-				
-				# pre-0.23 way of doing this 
-				sapply(ecor$cp[!file.info(ecor$cp)[,"isdir"]], 
-						function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
-							addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localFS()),
-						simplify=T)
-				
-				hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
-				hjob$submit() 
-				
-				file.remove(mapfunfilename)
-				mapfunfilename <- NULL
-				file.remove(reducefunfilename)
-				reducefunfilename <- NULL
-				
-			}, 
-			finally = {
-				if ( length(mapfunfilename) > 0 )  file.remove(mapfunfilename)
-				if ( length(reducefunfilename) > 0 ) file.remove(reducefunfilename)
-			}
-	)
+initialize.HJob <- function(hconf, overwrite=F ) {
+  
+  if ( length(hconf$mapfun)==0 )
+    stop ("Mapper not specified in configuration.")
+  
+  jfs <- .ecor.fs()
+  
+  #set up job temporary dir 
+  tstamp<- Sys.time()
+  tstamp <- format(tstamp,"%Y%m%d_%H%M%S")
+  r <- sprintf("%08X",as.integer(runif(1)*(2^32-1)-2^31))
+  tstamp <- sprintf("%s_%s",tstamp,r)
+  
+  jobTmpDir <- file.path("/temp","R",tstamp)
+  jfs$mkdirs(.ecor.jpath(jobTmpDir))
+  
+  
+  hconf$set("ecor.NAMESPACES", .ecor.toB64(loadedNamespaces()))
+
+  fcleanup <- character(0)
+  
+  mapfunfile <- tempfile()
+  fcleanup<- c(fcleanup,mapfunfile)
+  
+  f <- file(mapfunfile, open="wb")
+  tryCatch({
+        # my tests seem to indicate 
+        # that this serializes all the function 
+        # environment too.
+        serialize(hconf$mapfun, f, ascii = F)
+      },
+      finally = close(f)
+  )
+  jmapfunfile <- .ecor.jpath(jobTmpDir, basename(mapfunfile))
+  jfs$copyFromLocalFile(T,T,.ecor.jpath(mapfunfile),
+      jmapfunfile)
+  hconf$set("ecor.MAPFUN", basename(mapfunfile))
+  
+  reducefunfile <- NULL
+  jreducefunfile <- NULL
+  if ( length(hconf$reducefun) >0  ) {
+    reducefunfile <- tempfile()
+    fcleanup<- c(fcleanup,reducefunfile)
+    
+    f <- file(reducefunfile, open="wb")
+    tryCatch({
+          serialize(hconf$reducefun,f,ascii = F)
+        },
+        finally = {
+          close(f)
+        })
+    jreducefunfile <- .ecor.jpath(jobTmpDir, basename(reducefunfile))
+    jfs$copyFromLocalFile(T,T,.ecor.jpath(reducefunfile),jreducefunfile)
+    hconf$set("ecor.REDUCEFUN", basename(reducefunfile))
+  }
+
+  jconf <- hconf$as.jconf()
+
+  # broadcast tempfile containing environment
+  J("org.apache.hadoop.filecache.DistributedCache")$
+  addCacheFile( new(J("java.net.URI"),jmapfunfile$toString()), jconf)
+  
+  if ( length(jreducefunfile)>0 )
+    J("org.apache.hadoop.filecache.DistributedCache")$
+    addCacheFile( new(J("java.net.URI"),jreducefunfile$toString()), jconf)
+  
+  # pre-0.23 way of doing this 
+  sapply(ecor$cp[!file.info(ecor$cp)[,"isdir"]], 
+      function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
+        addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localFS()),
+      simplify=T)
+  
+  hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
+  
+  if ( overwrite )  
+    jfs$delete(.ecor.jpath(hconf$getOutput()),T)
+  
+  hjob$submit() 
+
+  file.remove(fcleanup[file.exists(fcleanup)])
 }
 
 waitForCompletion.HJob <- function (verbose=F) {
@@ -376,7 +402,7 @@ waitForCompletion.HJob <- function (verbose=F) {
 
 
 ecor.HJob <- setRefClass("HJob",
-		fields=list(hjob="S4"),
+		fields=list(hjob="jobjRef"),
 		methods=list(
 				initialize=initialize.HJob,
 				waitForCompletion=waitForCompletion.HJob
