@@ -272,7 +272,7 @@ ecor.HConf <- setRefClass("HConf",
 				getReducer = getReducer.HConf,
 				setInput = setInput.HConf,
 				getInput = getInput.HConf,
-				mrSubmit = mrSubmit.HConfs
+				mrSubmit = mrSubmit.HConf
 				))
 		
 ##################################
