@@ -5,12 +5,28 @@
 #' \enumerate{
 #' \item{ install R } 
 #' \item{ \code{install.packages("rJava")}}
-#' \item{ configure R_HOME variable in the mapred user env (or whichever user runs the tasks)
-#'   on Ubuntu it is usually /usr/lib/R }
-#' \item{ symbolic-link /lib64/libjri.so -> /usr/local/lib/R/site-library/rJava/jri/libjri.so
-#'   (or otherwise make sure libjri.so is available thru java.library.path at the time 
-#'    of MR task loading) }
+#' \item{ configure R_HOME in the backend ( on Ubuntu it is usually /usr/lib/R)}
+#' \item{ add whatever path is returned by \code{system.file("jri",package="rJava")}
+#'   to the -Djava.library.path=... setting in the backend
 #' }
+#' }
+#' 
+#' example of data node properties added to core-site.xml: 
+#' \code{
+#' <property>
+#'   <name>mapred.child.env</name>
+#'   <value>R_HOME=/usr/lib/R</value>
+#' </property>
+#'
+#' <property>
+#'   <name>mapred.child.java.opts</name>
+#'   <value>-Djava.library.path=/home/dmitriy/R/x86_64-pc-linux-gnu-library/2.14/rJava/jri</value>
+#' </property>
+#' }
+#' 
+#' I also found that i may need to use <final> spec with some of those in the data nodes to lock them 
+#' from overrides.
+#' 
 #' \strong{Tip:} The following command should produce location dir of libjri.so:
 #' \code{R --vanilla <<< 'system.file("jri", package="rJava")'}
 #' 
@@ -200,6 +216,10 @@ initialize.HConf <- function (jconf=NULL) {
   
   props <<- character(0)
   
+  # by default look there
+  javalibpath <<- "/lib64"
+  memopts <<- "-Xmx500m"
+  
   if ( length(jconf)>0) {
     iter <- jconf$iterator()
     while (iter$hasNext() ) { 
@@ -210,6 +230,8 @@ initialize.HConf <- function (jconf=NULL) {
   props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
   props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
   props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+
+  hname <<- "R-Job"
 }
 
 #' convert to rJava \code{o.a.h}
@@ -252,13 +274,19 @@ getInput.HConf <- function () props[ecor$consts["INPUT"]]
 setOutput.HConf <- function(value) props[ecor$consts["OUTPUT"]] <<- value
 getOutput.HConf <- function () props[ecor$consts["OUTPUT"]]
 
+setName.HConf <- function(value) hname <<- value
+
 mrSubmit.HConf <- function (overwrite = F) ecor.HJob$new(.self, overwrite)
 
 #' R5 class holding MR configuration etc. stuff.
 #' 
 #' 
 ecor.HConf <- setRefClass("HConf", 
-		fields=list(props="character",mapfun="function",reducefun="function"),
+		fields=list(props="character",
+        mapfun="function",reducefun="function",
+        memopts="character",
+        javalibpath="character",
+        hname="character"),
 		methods=list(
 				initialize =initialize.HConf,
 				as.jconf =as.jconf.HConf,
@@ -276,6 +304,7 @@ ecor.HConf <- setRefClass("HConf",
 				getInput = getInput.HConf,
         setOutput = setOutput.HConf,
         getOutput = getOutput.HConf,
+        setName = setName.HConf,
 				mrSubmit = mrSubmit.HConf
 				))
 		
@@ -294,7 +323,7 @@ ecor.HConf <- setRefClass("HConf",
 }
 
 #local fs
-.ecor.localFS <- function () {
+.ecor.localfs <- function () {
 	J("org.apache.hadoop.fs.FileSystem")$getLocal(ecor$jconf)
 }
 
@@ -350,6 +379,7 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   jmapfunfile <- .ecor.jpath(jobTmpDir, basename(mapfunfile))
   jfs$copyFromLocalFile(T,T,.ecor.jpath(mapfunfile),
       jmapfunfile)
+  
   hconf$set("ecor.MAPFUN", basename(mapfunfile))
   
   reducefunfile <- NULL
@@ -369,9 +399,20 @@ initialize.HJob <- function(hconf, overwrite=F ) {
     jfs$copyFromLocalFile(T,T,.ecor.jpath(reducefunfile),jreducefunfile)
     hconf$set("ecor.REDUCEFUN", basename(reducefunfile))
   }
+  
+  #sorry, we have to hijack mapred.child.java.opts here.
+#  lp <- paste(hconf$javalibpath,collapse = ":")
+#  hconf$set("mapred.child.java.opts",
+#      sprintf("%s -Djava.library.path=%s", hconf$memopts, lp))
 
   jconf <- hconf$as.jconf()
 
+  # not clear if it does any good
+  # explicitly unset any jvm options because it would mask 
+  # the ones set in the backend by default:
+  jconf$set("mapred.child.java.opts", .jnull() )
+  
+  
   # broadcast tempfile containing environment
   J("org.apache.hadoop.filecache.DistributedCache")$
   addCacheFile( new(J("java.net.URI"),jmapfunfile$toString()), jconf)
@@ -379,18 +420,26 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   if ( length(jreducefunfile)>0 )
     J("org.apache.hadoop.filecache.DistributedCache")$
     addCacheFile( new(J("java.net.URI"),jreducefunfile$toString()), jconf)
+
+  jricp <- list.files(system.file("jri",package="rJava"),
+      full.names=T, pattern ="\\.jar$")
+  
+  cp <- c(ecor$cp,jricp)
   
   # pre-0.23 way of doing this 
-  sapply(ecor$cp[!file.info(ecor$cp)[,"isdir"]], 
+  sapply(cp[!file.info(cp)[,"isdir"]], 
       function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
-        addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localFS()),
+        addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localfs()),
       simplify=T)
   
   hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
   
+  
+  
   if ( overwrite )  
     jfs$delete(.ecor.jpath(hconf$getOutput()),T)
   
+  hjob$setJobName(hconf$hname)
   hjob$submit() 
 
   file.remove(fcleanup[file.exists(fcleanup)])

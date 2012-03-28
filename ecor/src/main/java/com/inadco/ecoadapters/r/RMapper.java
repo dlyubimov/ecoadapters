@@ -23,6 +23,10 @@ public class RMapper extends Mapper<Writable, Writable, Writable, Writable> {
         String str = conf.get(R_ARGS_PROP);
 
         String[] args = str == null ? new String[] { "--vanilla" } : str.split(" ");
+        
+        String rhome = System.getenv("R_HOME");
+        if ( rhome == null ) 
+            throw new IOException ("R_HOME is not set in the backend.");
 
         engine = new Rengine(args, false, null);
 

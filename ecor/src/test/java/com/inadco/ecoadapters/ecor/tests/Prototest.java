@@ -9,8 +9,8 @@ public class Prototest {
         
         Configuration conf = new Configuration();
         FileSystem fs = FileSystem.get(conf);
-        fs.copyFromLocalFile(delSrc, overwrite, src, dst)
-        fs.de
+//        fs.copyFromLocalFile(delSrc, overwrite, src, dst)
+//        fs.de
         
     }
 
