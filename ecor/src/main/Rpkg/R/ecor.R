@@ -410,7 +410,7 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   # not clear if it does any good
   # explicitly unset any jvm options because it would mask 
   # the ones set in the backend by default:
-  jconf$set("mapred.child.java.opts", .jnull() )
+  jconf$set("mapred.child.java.opts", "" )
   
   
   # broadcast tempfile containing environment
