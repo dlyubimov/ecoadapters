@@ -1,5 +1,10 @@
-#' R wrapper for running ecor queries etc. using rJava
+#' protobuf-R-MR adapters.
+#' 
+#' @description
+#' 
+#' Run R with mapReduce on (mostly) protobuf input as part of ecoadapters package.
 #'  
+#' @details 
 #' to enable running R on task nodes:
 #' 
 #' \enumerate{
@@ -7,28 +12,34 @@
 #' \item{ \code{install.packages("rJava")}}
 #' \item{ configure R_HOME in the backend ( on Ubuntu it is usually /usr/lib/R)}
 #' \item{ add whatever path is returned by \code{system.file("jri",package="rJava")}
-#'   to the -Djava.library.path=... setting in the backend
+#'   to the \code{-Djava.library.path=...} setting in the backend
 #' }
 #' }
 #' 
-#' example of data node properties added to core-site.xml: 
-#' \code{
+#' example of data node properties added to core-site.xml:
+#'  
+#' \preformatted{
 #' <property>
 #'   <name>mapred.child.env</name>
 #'   <value>R_HOME=/usr/lib/R</value>
 #' </property>
 #'
 #' <property>
-#'   <name>mapred.child.java.opts</name>
+#'   <name>mapred.map.child.java.opts</name>
 #'   <value>-Djava.library.path=/home/dmitriy/R/x86_64-pc-linux-gnu-library/2.14/rJava/jri</value>
 #' </property>
 #' }
 #' 
 #' I also found that i may need to use <final> spec with some of those in the data nodes to lock them 
-#' from overrides.
+#' from overrides.\cr\cr
 #' 
-#' \strong{Tip:} The following command should produce location dir of libjri.so:
-#' \code{R --vanilla <<< 'system.file("jri", package="rJava")'}
+#' Alternative (and perhaps better) way is to define those properties for tasktracker 
+#' in hadoop-env.sh. At this time I couldn't make it happen. \cr\cr
+#' 
+#' \strong{Tip:} The following command should produce location dir of libjri.so:\cr\cr
+#' 
+#' \code{R --vanilla <<< 'system.file("jri", package="rJava")'}\cr\cr
+#' 
 #' 
 #' @docType package
 #' @name ecor
@@ -216,10 +227,6 @@ initialize.HConf <- function (jconf=NULL) {
   
   props <<- character(0)
   
-  # by default look there
-  javalibpath <<- "/lib64"
-  memopts <<- "-Xmx500m"
-  
   if ( length(jconf)>0) {
     iter <- jconf$iterator()
     while (iter$hasNext() ) { 
@@ -283,9 +290,9 @@ mrSubmit.HConf <- function (overwrite = F) ecor.HJob$new(.self, overwrite)
 #' 
 ecor.HConf <- setRefClass("HConf", 
 		fields=list(props="character",
-        mapfun="function",reducefun="function",
-        memopts="character",
-        javalibpath="character",
+        mapfun="function",
+		reducefun="function",
+		namespaces="character",
         hname="character"),
 		methods=list(
 				initialize =initialize.HConf,
@@ -357,53 +364,30 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   tstamp <- sprintf("%s_%s",tstamp,r)
   
   jobTmpDir <- file.path("/temp","R",tstamp)
-  jfs$mkdirs(.ecor.jpath(jobTmpDir))
   
+  hconf$namespaces <- loadedNamespaces()
   
-  hconf$set("ecor.NAMESPACES", .ecor.toB64(loadedNamespaces()))
-
   fcleanup <- character(0)
   
-  mapfunfile <- tempfile()
-  fcleanup<- c(fcleanup,mapfunfile)
+  rjobfile <- tempfile()
+  fcleanup<- c(fcleanup, rjobfile)
   
-  f <- file(mapfunfile, open="wb")
+  f <- file(rjobfile, open="wb")
   tryCatch({
         # my tests seem to indicate 
         # that this serializes all the function 
         # environment too.
-        serialize(hconf$mapfun, f, ascii = F)
+        serialize(hconf, f, ascii = F)
       },
       finally = close(f)
   )
-  jmapfunfile <- .ecor.jpath(jobTmpDir, basename(mapfunfile))
-  jfs$copyFromLocalFile(T,T,.ecor.jpath(mapfunfile),
-      jmapfunfile)
   
-  hconf$set("ecor.MAPFUN", basename(mapfunfile))
-  
-  reducefunfile <- NULL
-  jreducefunfile <- NULL
-  if ( length(hconf$reducefun) >0  ) {
-    reducefunfile <- tempfile()
-    fcleanup<- c(fcleanup,reducefunfile)
-    
-    f <- file(reducefunfile, open="wb")
-    tryCatch({
-          serialize(hconf$reducefun,f,ascii = F)
-        },
-        finally = {
-          close(f)
-        })
-    jreducefunfile <- .ecor.jpath(jobTmpDir, basename(reducefunfile))
-    jfs$copyFromLocalFile(T,T,.ecor.jpath(reducefunfile),jreducefunfile)
-    hconf$set("ecor.REDUCEFUN", basename(reducefunfile))
-  }
+  hconf$set("ecor.hconffile", basename(rjobfile))
   
   #sorry, we have to hijack mapred.child.java.opts here.
-#  lp <- paste(hconf$javalibpath,collapse = ":")
-#  hconf$set("mapred.child.java.opts",
-#      sprintf("%s -Djava.library.path=%s", hconf$memopts, lp))
+  #  lp <- paste(hconf$javalibpath,collapse = ":")
+  #  hconf$set("mapred.child.java.opts",
+  #      sprintf("%s -Djava.library.path=%s", hconf$memopts, lp))
 
   jconf <- hconf$as.jconf()
 
@@ -414,13 +398,8 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   
   
   # broadcast tempfile containing environment
-  J("org.apache.hadoop.filecache.DistributedCache")$
-  addCacheFile( new(J("java.net.URI"),jmapfunfile$toString()), jconf)
+  J("com.inadco.ecoadapters.r.RMRHelper")$addCache(jconf,rjobfile,jobTmpDir);
   
-  if ( length(jreducefunfile)>0 )
-    J("org.apache.hadoop.filecache.DistributedCache")$
-    addCacheFile( new(J("java.net.URI"),jreducefunfile$toString()), jconf)
-
   jricp <- list.files(system.file("jri",package="rJava"),
       full.names=T, pattern ="\\.jar$")
   
@@ -433,8 +412,6 @@ initialize.HJob <- function(hconf, overwrite=F ) {
       simplify=T)
   
   hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
-  
-  
   
   if ( overwrite )  
     jfs$delete(.ecor.jpath(hconf$getOutput()),T)
@@ -471,78 +448,45 @@ ecor.HJob <- setRefClass("HJob",
 	buff
 }
 
-
-.ecor.tasksetup <- function ( jconf, jcontext, mapsetup=T ) {
-	
-	conf <- .ecor.jconf2hconf(jconf)
-	
-	# frontend packages translated to backend 
-	# to load here as well.
-	packages <- conf['ecor.NAMESPACES']
-	if ( packages == NULL ) 
-		stop ("no packages in the job configuration")
-	
-	packages <- .ecor.fromB64(packages)
-	
-	
-	require(packages)
-	
-	ecor$conf <<- conf
-	
-	filePaths <- as.list(J("org.apache.hadoop.filecache.DistributedCache")$getLocalCacheFiles())
-	filePaths <- sapply(filePaths, function(x) x$toString() )
-	names(filePaths) <- sapply(filePaths, function(x) basename(x))
-	
-	if ( mapsetup ) {
-		mapfunfilename <- conf['ecor.MAPFUN']
-		mapfunfilepath <- filePaths[[mapfunfilename]]
-		if ( mapfunfilepath == NULL ) 
-			stop ("Unable to locate map function file path in the distributed cache files.")
-		
-		MAPFUN <<- NULL
-		f <- file(mapfunfilepath, "rb")
-		tryCatch({
-					MAPFUN <<- unserialize(f)
-				},
-				finally = {
-					close(f)
-				})
-		
-	} else {
-		# TODO: reduce task setup.
-	}
-	
-	collectbuff <<- ecor.collectbuff()
-}
-
-.ecor.maptask <- function (jconf, jcontext, jkey, jvalue ) {
-	
-}
-
-
-# to be called internally by protobuf mapper 
-.ecor.protomaptask <- function ( key, msgBytes ) {
-	value <- proto.fromProtoRaw( msgBytes, ecor$d )
-	collectbuff <<- .ecor.collectbuff()
+.ecor.tasksetup <- function ( jconf, hconffile, mapsetup=T ) {
 	tryCatch({
-				MAPFUN(key,value )
-				collectbuff
+
+				hconf <- NULL 
+				
+				f <- file(hconffile, "rb")
+				tryCatch({
+							hconf <- unserialize(f)
+						},
+						finally = {
+							close(f)
+						})
+				
+				# frontend packages translated to backend 
+				# to load here as well.
+				packages <- hconf$namespaces
+				
+				if ( length(packages) == 0 ) 
+					stop ("no packages in the job configuration")
+				
+				require(packages)
+				
+				ecor$hconf <<- hconf
+				ecor$jconf <<- jconf
+				
+				T
 			},
-			finally = { 
-				rm(collectbuff) 
-			})
+			error=function(e) as.character(e)
+	)
 }
+
+.ecor.maptask <- function (jconf, jkey, jvalue ) {
+	collectbuff <- list()
+	#...
+	collectbuff
+}
+
 
 .ecor.reducetask <- function ( key, valueVector ) {
-	values <- as.list(valueVector)
-	collectbuff <<- .ecor.collectbuff
-	tryCatch({
-				REDUCEFUN(key,jmapvalue )
-				collectbuff
-			},
-			finally = { 
-				rm(collectbuff) 
-			})
 }
 
 ecor.collect <- function (key, value) {

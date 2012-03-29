@@ -120,7 +120,7 @@ test2 <- function () {
   
   hconf$setMapper(mapfun)
   hjob <- hconf$mrSubmit(T)
-	hjob$waitForCompletion()
+  hjob$waitForCompletion()
   
 }
 
