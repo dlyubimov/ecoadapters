@@ -135,6 +135,7 @@ NULL
 #' 
 #' @author dmitriy
 ecor.hadoopClassPath <- function () {
+	# TODO: use hadoop classpath to establish classpath instead.
 	hhome <- Sys.getenv("HADOOP_HOME")
 	
 	if ( nchar(hhome) ==0 )
@@ -162,6 +163,12 @@ ecor.hadoopClassPath <- function () {
 		stop ("Unable to find hadoop configuration files.")
 	
 	c(hadooplib, hadoopcore, hadoopconf)
+	
+	# this doesn't quite work yet. switch back to HADOOP_HOME
+#	hcp <- strsplit(system("hadoop classpath",intern=T),":|;")
+#	if ( length(hcp) == 0 )
+#		stop ("Can't execute \"hadoop classpath\" successfully.");
+#	hcp
 }
 
 #' Produce local hbase path
