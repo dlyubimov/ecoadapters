@@ -90,7 +90,7 @@ test2 <- function () {
 	
 
   #	expect_that(rawToChar(rl$idbuff),equals('012345566'))
-#	expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a string'))
+  # expect_that(rl$clickThru$advertiserAccountNumber, equals('this is a string'))
   
   valW <- ecor.ProtoWritable$new(
       'com.inadco.ecoadapters.ecor.tests.codegen.Tests$EcorTest')
@@ -99,7 +99,7 @@ test2 <- function () {
 	sfw <- ecor.SequenceFileW$new(infile,
 			valWritable=valW)
 	
-	tryCatch({
+  tryCatch({
 				#so vectorizaton and recycling
 				# is now supported by append. 
 				# we can write batches from vectors at once.
@@ -110,8 +110,20 @@ test2 <- function () {
 			}
 	)
   
+   mapsetupfun <- function() {
+	 d<<- proto.desc('com.inadco.ecoadapters.ecor.tests.codegen.Tests$EcorTest')
+   }
+	
   mapfun <- function ( key,value ) { 
-    ecor.collect(key,value)
+	rl <- proto.fromProtoRaw(value, d)
+	ecor.collect(rl$nested1$name, rl$nested1$name)
+	ecor.collect(rl$nested1$name, rl$nested2[[2]]$name)
+	stop ("from map.")
+  }
+  
+  reducefun <- function (key, vals ) {
+	  ecor.collect(key,vals)
+	  stop(sprintf("collected %d records.",length(vals)))
   }
   
   hconf <- ecor.HConf$new()
@@ -119,6 +131,8 @@ test2 <- function () {
   hconf$setOutput("/temp/rmr-out")
   
   hconf$setMapper(mapfun)
+  hconf$setMapSetup(mapsetupfun)
+  hconf$setReducer(reducefun)
   hjob <- hconf$mrSubmit(T)
   hjob$waitForCompletion()
   

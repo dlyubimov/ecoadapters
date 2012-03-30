@@ -99,6 +99,7 @@ NULL
 	consts <- character(0)
 	# tight integration with some hadoop stuff to bypass the need 
 	# to have that stuff in classpath and actually do wrapper java calls.
+	# Besides, having to make java calls on Job is a tight integration, too.
 	
 	consts["INPUT_FORMAT"] <- "mapreduce.inputformat.class"
 	consts["OUTPUT_FORMAT"] <- "mapreduce.outputformat.class"
@@ -109,6 +110,11 @@ NULL
 	consts["NAME"] <- "mapred.job.name"
 	consts["INPUT"] <- "mapred.input.dir"
 	consts["OUTPUT"] <- "mapred.output.dir"
+	consts["MAPOUTPUTKEY_CLASS"] <- "mapred.mapoutput.key.class"
+    consts["MAPOUTPUTVALUE_CLASS"] <- "mapred.mapoutput.value.class"
+    consts["OUTPUTKEY_CLASS"] <- "mapred.output.key.class"
+	consts["OUTPUTVALUE_CLASS"] <- "mapred.output.value.class"
+	consts["REDUCE_TASKS"] <- "mapred.reduce.tasks"
 	
 	ecor$consts <- consts
 	
@@ -235,9 +241,16 @@ initialize.HConf <- function (jconf=NULL) {
     }
   }
   props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
+  props[ecor$consts["REDUCE"]] <<- "com.inadco.ecoadapters.r.RReducer"
   props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
   props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+  
+  props[ecor$consts["MAPOUTPUTKEY_CLASS"]] <<- "org.apache.hadoop.io.Text"
+  props[ecor$consts["MAPOUTPUTVALUE_CLASS"]] <<- "org.apache.hadoop.io.BytesWritable"
 
+  props[ecor$consts["OUTPUTKEY_CLASS"]] <<- "org.apache.hadoop.io.Text"
+  props[ecor$consts["OUTPUTVALUE_CLASS"]] <<- "org.apache.hadoop.io.BytesWritable"
+  
   hname <<- "R-Job"
 }
 
@@ -285,12 +298,18 @@ setName.HConf <- function(value) hname <<- value
 
 mrSubmit.HConf <- function (overwrite = F) ecor.HJob$new(.self, overwrite)
 
+setMapSetup.HConf <- function (value) mapsetupfun<<- value
+setReduceSetup.HConf <- function (value) reducesetupfun <<- value
+setReduceTasks.HConf <- function (value) props[ecor$consts["REDUCE_TASKS"]] <<- as.character( value) 
+
 #' R5 class holding MR configuration etc. stuff.
 #' 
 #' 
 ecor.HConf <- setRefClass("HConf", 
 		fields=list(props="character",
+		mapsetupfun = "function",
         mapfun="function",
+		reducesetupfun="function",
 		reducefun="function",
 		namespaces="character",
         hname="character"),
@@ -303,12 +322,15 @@ ecor.HConf <- setRefClass("HConf",
 				getInputFormat = getInputFormat.HConf,
 				setOutputFormat = setOutputFormat.HConf,
 				getOutputFormat = getOutputFormat.HConf,
+				setMapSetup = setMapSetup.HConf,
+				setReduceSetup = setReduceSetup.HConf,
 				setMapper = setMapper.HConf,
 				getMapper = getMapper.HConf,
 				setReducer = setReducer.HConf,
 				getReducer = getReducer.HConf,
 				setInput = setInput.HConf,
 				getInput = getInput.HConf,
+				setReduceTasks = setReduceTasks.HConf,
         setOutput = setOutput.HConf,
         getOutput = getOutput.HConf,
         setName = setName.HConf,
@@ -384,6 +406,10 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   
   hconf$set("ecor.hconffile", basename(rjobfile))
   
+  # map-only?
+  if ( length(hconf$reducefun)==0)
+	  setReduceTasks(0L)
+  
   #sorry, we have to hijack mapred.child.java.opts here.
   #  lp <- paste(hconf$javalibpath,collapse = ":")
   #  hconf$set("mapred.child.java.opts",
@@ -448,9 +474,20 @@ ecor.HJob <- setRefClass("HJob",
 	buff
 }
 
-.ecor.tasksetup <- function ( jconf, hconffile, mapsetup=T ) {
-	tryCatch({
+#' 
+#' @param e the simple error object
+.ecor.stackTrace <- function (e)  
+	paste( c(as.character(e), 
+					"frame stack: ",
+					names(errframes)),
+			collapse = "\n") 
 
+
+.ecor.tasksetup <- function ( jconf, hconffile, mapsetup=T ) {
+	
+	options(error=quote(dump.frames("errframes", F)))
+	
+	tryCatch({
 				hconf <- NULL 
 				
 				f <- file(hconffile, "rb")
@@ -473,32 +510,67 @@ ecor.HJob <- setRefClass("HJob",
 				ecor$hconf <<- hconf
 				ecor$jconf <<- jconf
 				
+				if ( mapsetup ) { 
+					if (length(ecor$hconf$mapsetupfun) ==1)
+						ecor$hconf$mapsetupfun();
+				} else {
+					if (length(ecor$hconf$reducesetupfun) ==1)
+						ecor$hconf$reducesetupfun();
+					
+				}
+				
+				
 				T
 			},
-			error=function(e) as.character(e)
+			error = function(e) .ecor.stackTrace(e)
 	)
 }
 
 .ecor.maptask <- function (jconf, jkey, jvalue ) {
-	collectbuff <- list()
-	#...
-	collectbuff
+	tryCatch({
+				ecor$hconf$mapfun(jkey,jvalue)
+				T
+			}, 
+			error=function(e) .ecor.stackTrace(e))
 }
 
 
-.ecor.reducetask <- function ( key, valueVector ) {
+.ecor.reducetask <- function ( jconf, key, jvalueIter ) {
+	tryCatch({
+				if ( length(ecor$hconf$reducefun)==0) 
+					stop("R reducer not configured. Perhaps you wanted to do map-only job?")
+				
+				stop("in reducer")
+				
+				vals <- list()
+				len <- 0L
+				
+				# this will not work well with skewed data though.  
+				
+				while (.jcall(jvalueIter,"Z","hasNext")) {
+					bw <- .jcall(jvalueIter,"Ljava/lang/Object;","next")
+					v <- .jcall(bw,"[B",getBytes,evalArray=T)
+					l <- .jcall(bw,"I", getLength,simplify=T)
+					len <- len +1L 
+					vals [[len]] <- unserialize(v[1:l])
+				}
+				
+				ecor$hconf$reducefun(key, vals)
+				T
+			}, 
+			error=function(e) .ecor.stackTrace(e)
+	)
 }
 
 ecor.collect <- function (key, value) {
+
+	jkey <- as.character(key)
+	if ( length(jkey)!= 1)
+		stop ("must be exactly one character key value")
 	
-	collectbuff$keys[[ collectbuffsize ]] <- switch(mode(key), 
-			numeric=key,
-			integer=key,
-			character=key,
-			serialize(key,NULL))
+	jvalue <- .jarray(serialize(value,NULL))
 	
-	collectbuff$values[[ collectbuff$size ]] <- serialize(value,NULL)
-	collectbuff$size <- collectbuff$size + 1 
+	.jcall(ecocollector____,"V","add",jkey,jvalue)
 	
 }
 

@@ -1,11 +1,18 @@
 package com.inadco.ecoadapters.r;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.rosuda.JRI.REXP;
 import org.rosuda.JRI.Rengine;
 
@@ -49,13 +56,21 @@ public final class RMRHelper {
             engine.assign("hjconf", jconf);
             engine.assign("hconffile", localJobFile.toString());
 
-            // some of our callback functions are hidden on purpose in order not
-            // to
-            // export them into
-            // public api
+            /*
+             * apparently this needs to be executed before we set any functions up.
+             */
+            engine.eval("options(error=quote(dump.frames(\"errframes\", F)))");
+
+            /*
+             * some of our callback functions are hidden on purpose in order not
+             * to export them into public api
+             */
             engine.eval("{f<-getAnywhere('.ecor.tasksetup'); fsetup<<- f$obj[[which(f$where=='namespace:ecor')]]}");
-            engine.eval("{f<-getAnywhere('.ecor.maptask'); fmap<<- f$obj[[which(f$where=='namespace:ecor')]]}");
-            engine.eval("{f<-getAnywhere('.ecor.reducetask'); freduce<<- f$obj[[which(f$where=='namespace:ecor')]]}");
+            if (map)
+                engine.eval("{f<-getAnywhere('.ecor.maptask'); fmap<<- f$obj[[which(f$where=='namespace:ecor')]]}");
+            else
+                engine
+                    .eval("{f<-getAnywhere('.ecor.reducetask'); freduce<<- f$obj[[which(f$where=='namespace:ecor')]]}");
 
             REXP r =
                 map ? engine.eval("fsetup(hjconf, hconffile, mapsetup=T )") : engine
@@ -100,6 +115,32 @@ public final class RMRHelper {
         fs.copyFromLocalFile(true, true, localFPath, remoteFPath);
 
         DistributedCache.addCacheFile(remoteFPath.toUri(), conf);
+    }
+
+    // should cover most common writables conversion to R primitive types
+    public static void assignWritable(Rengine engine, String varName, Writable w) throws IOException {
+
+        if (w instanceof IntWritable)
+            engine.assign(varName, new int[] { ((IntWritable) w).get() });
+        else if (w instanceof Text)
+            engine.assign(varName, ((Text) w).toString());
+        else if (w instanceof BytesWritable) {
+            byte[] b = ((BytesWritable) w).getBytes();
+            int len = ((BytesWritable) w).getLength();
+            if (len < b.length)
+                b = Arrays.copyOf(b, len);
+            engine.assign("bval____", engine.createRJavaRef(b));
+            engine.eval(varName + "<- .jevalArray(bval____);rm(bval____)");
+
+        } else if (w instanceof LongWritable)
+            engine.assign(varName, new double[] { ((LongWritable) w).get() });
+        else if (w instanceof DoubleWritable)
+            engine.assign(varName, new double[] { ((DoubleWritable) w).get() });
+        else if (w == null)
+            engine.eval(varName + "<-NULL");
+        else
+            engine.assign(varName, engine.createRJavaRef(w));
+
     }
 
 }

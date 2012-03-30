@@ -4,6 +4,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.rosuda.JRI.REXP;
 import org.rosuda.JRI.RList;
+import org.rosuda.JRI.RVector;
 import org.rosuda.JRI.Rengine;
 import org.testng.annotations.Test;
 
@@ -39,13 +40,22 @@ public class JRITest {
         r=engine.eval("'abc'");
         System.out.println(""+r.getType()+ (r.getType()==REXP.XT_STR));
         
-        r=engine.eval("list(a=\"B\")");
+        r=engine.eval("list(a=list(\"B\",\"D\", list(sublist=\"s\")))");
         System.out.println(""+r.getType()+ (r.getType()==REXP.XT_VECTOR));
         
         RList rlist = r.asList();
-        System.out.println(rlist.at("a").asString());
+        REXP axp = rlist.at("a");
+        RList al = axp.asList();
+        RVector av = axp.asVector();
+
+        if ( al != null ) 
+            System.out.printf("%s\n",/*al.keys().length,*/al.at(0));
+        if ( av != null ) 
+            System.out.printf("%d,%s\n", av.size(), av.at(0) );
+
         
-        System.out.println(r.toString());
+        
+//        System.out.printf("%s,%s\n", r.toString(), r.);
         
         engine.end();
 

@@ -41,7 +41,7 @@ write.ProtoWritable <- function ( rlist ) {
 	len <- length(x)
 	x <- if (len == 0  ) .jnull("[B") else .jarray(as.raw(x)) 
 	
-	.jcall(jwritable,"V","set", x, 0L, len - 1L)
+	.jcall(jwritable,"V","set", x, 0L, len)
 }
 
 
