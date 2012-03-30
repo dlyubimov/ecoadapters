@@ -43,9 +43,10 @@
 #' 
 #' @docType package
 #' @name ecor
-#' @exportPattern "^ecor\\.|^proto\\."
+#' @exportPattern "^ecor\\.|^proto\\.|^hdfs\\."
 #' @import rJava
 #' @include protobuf.R
+#' @include hdfs.R
 #' @include sequenceFile.R
 NULL
 
@@ -68,6 +69,8 @@ NULL
 	hadoopcp <- ecor.hadoopClassPath()
 	
 	if ( pkgInit ) {
+		options(error=quote(dump.frames("errframes", F)))
+		
 		.jpackage(pkgname, morePaths = hadoopcp, lib.loc = libname)
 		cp <- list.files(system.file("java",package=pkgname,lib.loc=libname),
 				full.names=T, pattern ="\\.jar$")
@@ -342,24 +345,6 @@ ecor.HConf <- setRefClass("HConf",
 ##################################
 
 
-# convert string to Path 
-.ecor.jpath <- function(parent, child = NULL) {
-	if ( length(child) == 0 )
-		new ( J("org.apache.hadoop.fs.Path"), parent )
-	else 
-		new ( J("org.apache.hadoop.fs.Path"),
-				.ecor.jpath(parent),child)
-}
-
-#local fs
-.ecor.localfs <- function () {
-	J("org.apache.hadoop.fs.FileSystem")$getLocal(ecor$jconf)
-}
-
-#dfs
-.ecor.fs <- function () 
-  J("org.apache.hadoop/fs.FileSystem")$get(ecor$jconf)
-
 .ecor.toB64 <- function(x) {
 	rawx <- serialize(x, NULL, ascii = F)
 	rawToChar(J("org.apache.commons.codec.binary.Base64")$encodeBase64(.jarray(rawx)))
@@ -377,7 +362,7 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   if ( length(hconf$mapfun)==0 )
     stop ("Mapper not specified in configuration.")
   
-  jfs <- .ecor.fs()
+  jfs <- hdfs.dfs()
   
   #set up job temporary dir 
   tstamp<- Sys.time()
@@ -385,7 +370,7 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   r <- sprintf("%08X",as.integer(runif(1)*(2^32-1)-2^31))
   tstamp <- sprintf("%s_%s",tstamp,r)
   
-  jobTmpDir <- file.path("/temp","R",tstamp)
+  tempDir <<- file.path("/temp","R",tstamp)
   
   hconf$namespaces <- loadedNamespaces()
   
@@ -424,23 +409,25 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   
   
   # broadcast tempfile containing environment
-  J("com.inadco.ecoadapters.r.RMRHelper")$addCache(jconf,rjobfile,jobTmpDir);
+  J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(rjobfile), tempDir, F);
   
   jricp <- list.files(system.file("jri",package="rJava"),
       full.names=T, pattern ="\\.jar$")
   
   cp <- c(ecor$cp,jricp)
+
+  J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(cp), tempDir, T);
   
   # pre-0.23 way of doing this 
-  sapply(cp[!file.info(cp)[,"isdir"]], 
-      function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
-        addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localfs()),
-      simplify=T)
+#  sapply(cp[!file.info(cp)[,"isdir"]], 
+#      function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
+#        addFileToClassPath(hdfs.path(f), jconf, hdfs.localfs()),
+#      simplify=T)
   
   hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
   
   if ( overwrite )  
-    jfs$delete(.ecor.jpath(hconf$getOutput()),T)
+    hdfs.delete(jfs, hconf$getOutput(), T)
   
   hjob$setJobName(hconf$hname)
   hjob$submit() 
@@ -449,12 +436,18 @@ initialize.HJob <- function(hconf, overwrite=F ) {
 }
 
 waitForCompletion.HJob <- function (verbose=F) {
-	hjob$waitForCompletion(verbose)
+	tryCatch( 
+			hjob$waitForCompletion(verbose),
+			finally = if ( length(tempDir)==1 ) 
+				hdfs.delete(hdfs.dfs(), tempDir, T)
+	)
 }
 
 
 ecor.HJob <- setRefClass("HJob",
-		fields=list(hjob="jobjRef"),
+		fields=list(
+				hjob="jobjRef",
+				tempDir="character"),
 		methods=list(
 				initialize=initialize.HJob,
 				waitForCompletion=waitForCompletion.HJob
@@ -476,16 +469,21 @@ ecor.HJob <- setRefClass("HJob",
 
 #' 
 #' @param e the simple error object
-.ecor.stackTrace <- function (e)  
-	paste( c(as.character(e), 
+.ecor.stackTrace <- function (e) {
+	ef <- getAnywhere("errframes")
+	ef <- ef$objs[which(ef$where==".GlobalEnv")]
+	
+	if ( length(ef)==1) {
+		paste( c(as.character(e), 
 					"frame stack: ",
-					names(errframes)),
+					names(ef)),
 			collapse = "\n") 
-
+	} else {
+		as.character(e)
+	}
+}
 
 .ecor.tasksetup <- function ( jconf, hconffile, mapsetup=T ) {
-	
-	options(error=quote(dump.frames("errframes", F)))
 	
 	tryCatch({
 				hconf <- NULL 
@@ -540,8 +538,6 @@ ecor.HJob <- setRefClass("HJob",
 				if ( length(ecor$hconf$reducefun)==0) 
 					stop("R reducer not configured. Perhaps you wanted to do map-only job?")
 				
-				stop("in reducer")
-				
 				vals <- list()
 				len <- 0L
 				
@@ -549,8 +545,8 @@ ecor.HJob <- setRefClass("HJob",
 				
 				while (.jcall(jvalueIter,"Z","hasNext")) {
 					bw <- .jcall(jvalueIter,"Ljava/lang/Object;","next")
-					v <- .jcall(bw,"[B",getBytes,evalArray=T)
-					l <- .jcall(bw,"I", getLength,simplify=T)
+					v <- .jcall(bw,"[B","getBytes",evalArray=T)
+					l <- .jcall(bw,"I", "getLength",simplify=T)
 					len <- len +1L 
 					vals [[len]] <- unserialize(v[1:l])
 				}

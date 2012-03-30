@@ -57,7 +57,8 @@ public final class RMRHelper {
             engine.assign("hconffile", localJobFile.toString());
 
             /*
-             * apparently this needs to be executed before we set any functions up.
+             * apparently this needs to be executed before we set any functions
+             * up.
              */
             engine.eval("options(error=quote(dump.frames(\"errframes\", F)))");
 
@@ -102,19 +103,26 @@ public final class RMRHelper {
         return engine;
     }
 
-    public static void addCache(Configuration conf, String localFName, String hdfsTempDir) throws IOException {
+    public static void addFileToCache(Configuration conf, String[] localFNames, String hdfsTempDir, boolean toCP)
+        throws IOException {
         // make sure remote hdfs temp dir exists
         FileSystem fs = FileSystem.get(conf);
         Path dfsTemp = new Path(hdfsTempDir);
         if (!fs.exists(dfsTemp) && !fs.mkdirs(dfsTemp))
             throw new IOException(String.format("Unable to create path %s.", dfsTemp.toString()));
 
-        Path localFPath = new Path(localFName);
-        Path remoteFPath = new Path(dfsTemp, localFPath.getName());
+        for (String localFName : localFNames) {
+            Path localFPath = new Path(localFName);
+            Path remoteFPath = new Path(dfsTemp, localFPath.getName());
 
-        fs.copyFromLocalFile(true, true, localFPath, remoteFPath);
+            fs.copyFromLocalFile(!toCP, true, localFPath, remoteFPath);
 
-        DistributedCache.addCacheFile(remoteFPath.toUri(), conf);
+            if (toCP) {
+                DistributedCache.addFileToClassPath(remoteFPath, conf);
+            } else {
+                DistributedCache.addCacheFile(remoteFPath.toUri(), conf);
+            }
+        }
     }
 
     // should cover most common writables conversion to R primitive types
