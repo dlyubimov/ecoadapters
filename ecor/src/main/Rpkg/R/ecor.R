@@ -235,6 +235,65 @@ ecor.pigClassPath <- function () {
 	c(piglib,pigcore)
 }
 
+#################################################
+# MR stuff starts here.                         # 
+#################################################
+
+
+#' @title 
+#' hadoop MR
+#' 
+#' @description 
+#' simple MR wrapper for most typical single-input MR scenario.
+#' 
+#' @param input hdfs file path(s) or glob(s) for MR input
+#' @param output hdfs output path (must not exist unless \code{overwrite==T})
+#' @param MAPFUN map function in a form MAPFUN(key,value)
+#' @param REDUCEFUN reduce function in a form (key2, valuelist)
+#' @param MAPSETUPFUN map setup function (no parameters passed in)
+#' @param REDUCESETUPFUN reduce task setup function (no parameters passed in)
+#' @param reduceTasks number of reduce tasks to run
+#' @param overwrite if TRUE and \code{output} directory already exists, it will be deleted first.
+#' @param wait Wait till job is complete. One can start multiple jobs and wait for them later.
+#' @return if \code{wait==FALSE} returns ecor.HJob R5 object representing job handle . Otherwise, 
+#' if waiting for job completion is requested, returns result of \code{HJob$waitForCompletion()}
+#' which is TRUE if job was successful and FALSE otherwise.
+#' 
+#' @details 
+#' launches simple one-input hadoop mapReduce job with the functions specified.
+#' The input in this version is assumed to be Hadoop sequence file. Supported key types 
+#' or values at this point are IntWritable, LongWritable, DoubleWritable, Text or BytesWritable.
+#' They are transformed to simple R types per rJava simple type convertion. 
+#' BytesWritable is converted to raw.
+#' 
+#' @section 
+#' map or reduce task may collect outputs using \link{ecor.collect} method.
+ecor.MR <- function(input, output, MAPFUN, REDUCEFUN = NULL, MAPSETUPFUN = NULL, REDUCESETUPFUN = NULL, 
+		reduceTasks= if(length(REDUCEFUN)==0) 0 else 1, overwrite=F, wait=T) {
+	if ( length (input)>1 )
+		input <- paste(input, collapse = ";")
+	
+	hconf <- ecor.HConf$new()
+	hconf$setInput(input)
+	hconf$setOutput(output)
+	hconf$setMapper(MAPFUN)
+	
+	if ( length(MAPSETUPFUN)==1)
+		hconf$setMapSetup(MAPSETUPFUN)
+	if ( length(REDUCEFUN)==1)
+		hconf$setReducer(REDUCEFUN)
+	if ( length(REDUCESETUPFUN)==1)
+		hconf$setReduceSetup(REDUCESETUPFUN)
+	hconf$setReduceTasks(reduceTasks)
+	
+	hjob <- hconf$mrSubmit(overwrite)
+	
+	if (wait) 
+		hjob$waitForCompletion()
+	else
+		hjob
+} 
+
 #' initialize new HConf instance.
 #' 
 #' @method initialize HConf
@@ -565,6 +624,19 @@ ecor.HJob <- setRefClass("HJob",
 	)
 }
 
+#' @title 
+#' Collect key and values from R tasks
+#' 
+#' @description 
+#' Collect keys and values from R tasks. 
+#' 
+#' @details 
+#' Currently, key is coerced with as.character() and 
+#' saved as Text writable. Value is R-serialized and saved 
+#' as BytesWritable.
+#' 
+#' @param key key (will be coerced to a character vector of length 1)
+#' @param value R object to be serialized 
 ecor.collect <- function (key, value) {
 
 	jkey <- as.character(key)

@@ -147,14 +147,17 @@ testMR <- function () {
 #	  stop(sprintf("collected %d records.",length(vals)))
 	}
 	
-	hconf <- ecor.HConf$new()
-	hconf$setInput( "/temp/swftest1.seq" )
-	hconf$setOutput("/temp/rmr-out")
+	hjob <- ecor.MR(
+			"/temp/swftest1.seq",
+			"/temp/rmr-out",
+			mapfun,
+			reducefun,
+			mapsetupfun,
+			reduceTasks=3,
+			overwrite=T,
+			wait=F
+			)
 	
-	hconf$setMapper(mapfun)
-	hconf$setMapSetup(mapsetupfun)
-	hconf$setReducer(reducefun)
-	hjob <- hconf$mrSubmit(T)
 	hjob$waitForCompletion()
 	
 }
