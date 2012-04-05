@@ -200,7 +200,7 @@ ecor.hBaseClassPath <- function () {
 			pattern="^hbase-.*\\.jar"
 	)
 	hbconf <- file.path(hhome,"conf")
-	if ( ! file.exists(hadoopconf) )
+	if ( ! file.exists(hbconf) )
 		stop ("Unable to find hbase configuration files.")
 	
 	c(hbaselib,hbasecore,hbconf)
