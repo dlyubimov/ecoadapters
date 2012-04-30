@@ -43,9 +43,10 @@
 #' 
 #' @docType package
 #' @name ecor
-#' @exportPattern "^ecor\\.|^proto\\."
+#' @exportPattern "^ecor\\.|^proto\\.|^hdfs\\."
 #' @import rJava
 #' @include protobuf.R
+#' @include hdfs.R
 #' @include sequenceFile.R
 NULL
 
@@ -68,6 +69,8 @@ NULL
 	hadoopcp <- ecor.hadoopClassPath()
 	
 	if ( pkgInit ) {
+		options(error=quote(dump.frames("errframes", F)))
+		
 		.jpackage(pkgname, morePaths = hadoopcp, lib.loc = libname)
 		cp <- list.files(system.file("java",package=pkgname,lib.loc=libname),
 				full.names=T, pattern ="\\.jar$")
@@ -132,6 +135,7 @@ NULL
 #' 
 #' @author dmitriy
 ecor.hadoopClassPath <- function () {
+	# TODO: use hadoop classpath to establish classpath instead.
 	hhome <- Sys.getenv("HADOOP_HOME")
 	
 	if ( nchar(hhome) ==0 )
@@ -159,6 +163,12 @@ ecor.hadoopClassPath <- function () {
 		stop ("Unable to find hadoop configuration files.")
 	
 	c(hadooplib, hadoopcore, hadoopconf)
+	
+	# this doesn't quite work yet. switch back to HADOOP_HOME
+#	hcp <- strsplit(system("hadoop classpath",intern=T),":|;")
+#	if ( length(hcp) == 0 )
+#		stop ("Can't execute \"hadoop classpath\" successfully.");
+#	hcp
 }
 
 #' Produce local hbase path
@@ -190,7 +200,7 @@ ecor.hBaseClassPath <- function () {
 			pattern="^hbase-.*\\.jar"
 	)
 	hbconf <- file.path(hhome,"conf")
-	if ( ! file.exists(hadoopconf) )
+	if ( ! file.exists(hbconf) )
 		stop ("Unable to find hbase configuration files.")
 	
 	c(hbaselib,hbasecore,hbconf)
@@ -224,6 +234,65 @@ ecor.pigClassPath <- function () {
 	
 	c(piglib,pigcore)
 }
+
+#################################################
+# MR stuff starts here.                         # 
+#################################################
+
+
+#' @title 
+#' hadoop MR
+#' 
+#' @description 
+#' simple MR wrapper for most typical single-input MR scenario.
+#' 
+#' @param input hdfs file path(s) or glob(s) for MR input
+#' @param output hdfs output path (must not exist unless \code{overwrite==T})
+#' @param MAPFUN map function in a form MAPFUN(key,value)
+#' @param REDUCEFUN reduce function in a form (key2, valuelist)
+#' @param MAPSETUPFUN map setup function (no parameters passed in)
+#' @param REDUCESETUPFUN reduce task setup function (no parameters passed in)
+#' @param reduceTasks number of reduce tasks to run
+#' @param overwrite if TRUE and \code{output} directory already exists, it will be deleted first.
+#' @param wait Wait till job is complete. One can start multiple jobs and wait for them later.
+#' @return if \code{wait==FALSE} returns ecor.HJob R5 object representing job handle . Otherwise, 
+#' if waiting for job completion is requested, returns result of \code{HJob$waitForCompletion()}
+#' which is TRUE if job was successful and FALSE otherwise.
+#' 
+#' @details 
+#' launches simple one-input hadoop mapReduce job with the functions specified.
+#' The input in this version is assumed to be Hadoop sequence file. Supported key types 
+#' or values at this point are IntWritable, LongWritable, DoubleWritable, Text or BytesWritable.
+#' They are transformed to simple R types per rJava simple type convertion. 
+#' BytesWritable is converted to raw.
+#' 
+#' @section 
+#' map or reduce task may collect outputs using \link{ecor.collect} method.
+ecor.MR <- function(input, output, MAPFUN, REDUCEFUN = NULL, MAPSETUPFUN = NULL, REDUCESETUPFUN = NULL, 
+		reduceTasks= if(length(REDUCEFUN)==0) 0 else 1, overwrite=F, wait=T) {
+	if ( length (input)>1 )
+		input <- paste(input, collapse = ";")
+	
+	hconf <- ecor.HConf$new()
+	hconf$setInput(input)
+	hconf$setOutput(output)
+	hconf$setMapper(MAPFUN)
+	
+	if ( length(MAPSETUPFUN)==1)
+		hconf$setMapSetup(MAPSETUPFUN)
+	if ( length(REDUCEFUN)==1)
+		hconf$setReducer(REDUCEFUN)
+	if ( length(REDUCESETUPFUN)==1)
+		hconf$setReduceSetup(REDUCESETUPFUN)
+	hconf$setReduceTasks(reduceTasks)
+	
+	hjob <- hconf$mrSubmit(overwrite)
+	
+	if (wait) 
+		hjob$waitForCompletion()
+	else
+		hjob
+} 
 
 #' initialize new HConf instance.
 #' 
@@ -342,24 +411,6 @@ ecor.HConf <- setRefClass("HConf",
 ##################################
 
 
-# convert string to Path 
-.ecor.jpath <- function(parent, child = NULL) {
-	if ( length(child) == 0 )
-		new ( J("org.apache.hadoop.fs.Path"), parent )
-	else 
-		new ( J("org.apache.hadoop.fs.Path"),
-				.ecor.jpath(parent),child)
-}
-
-#local fs
-.ecor.localfs <- function () {
-	J("org.apache.hadoop.fs.FileSystem")$getLocal(ecor$jconf)
-}
-
-#dfs
-.ecor.fs <- function () 
-  J("org.apache.hadoop/fs.FileSystem")$get(ecor$jconf)
-
 .ecor.toB64 <- function(x) {
 	rawx <- serialize(x, NULL, ascii = F)
 	rawToChar(J("org.apache.commons.codec.binary.Base64")$encodeBase64(.jarray(rawx)))
@@ -377,7 +428,7 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   if ( length(hconf$mapfun)==0 )
     stop ("Mapper not specified in configuration.")
   
-  jfs <- .ecor.fs()
+  jfs <- hdfs.dfs()
   
   #set up job temporary dir 
   tstamp<- Sys.time()
@@ -385,7 +436,7 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   r <- sprintf("%08X",as.integer(runif(1)*(2^32-1)-2^31))
   tstamp <- sprintf("%s_%s",tstamp,r)
   
-  jobTmpDir <- file.path("/temp","R",tstamp)
+  tempDir <<- file.path("/temp","R",tstamp)
   
   hconf$namespaces <- loadedNamespaces()
   
@@ -424,23 +475,25 @@ initialize.HJob <- function(hconf, overwrite=F ) {
   
   
   # broadcast tempfile containing environment
-  J("com.inadco.ecoadapters.r.RMRHelper")$addCache(jconf,rjobfile,jobTmpDir);
+  J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(rjobfile), tempDir, F);
   
   jricp <- list.files(system.file("jri",package="rJava"),
       full.names=T, pattern ="\\.jar$")
   
   cp <- c(ecor$cp,jricp)
+
+  J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(cp), tempDir, T);
   
   # pre-0.23 way of doing this 
-  sapply(cp[!file.info(cp)[,"isdir"]], 
-      function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
-        addFileToClassPath(.ecor.jpath(f), jconf, .ecor.localfs()),
-      simplify=T)
+#  sapply(cp[!file.info(cp)[,"isdir"]], 
+#      function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
+#        addFileToClassPath(hdfs.path(f), jconf, hdfs.localfs()),
+#      simplify=T)
   
   hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
   
   if ( overwrite )  
-    jfs$delete(.ecor.jpath(hconf$getOutput()),T)
+    hdfs.delete(jfs, hconf$getOutput(), T)
   
   hjob$setJobName(hconf$hname)
   hjob$submit() 
@@ -449,12 +502,18 @@ initialize.HJob <- function(hconf, overwrite=F ) {
 }
 
 waitForCompletion.HJob <- function (verbose=F) {
-	hjob$waitForCompletion(verbose)
+	tryCatch( 
+			hjob$waitForCompletion(verbose),
+			finally = if ( length(tempDir)==1 ) 
+				hdfs.delete(hdfs.dfs(), tempDir, T)
+	)
 }
 
 
 ecor.HJob <- setRefClass("HJob",
-		fields=list(hjob="jobjRef"),
+		fields=list(
+				hjob="jobjRef",
+				tempDir="character"),
 		methods=list(
 				initialize=initialize.HJob,
 				waitForCompletion=waitForCompletion.HJob
@@ -476,16 +535,21 @@ ecor.HJob <- setRefClass("HJob",
 
 #' 
 #' @param e the simple error object
-.ecor.stackTrace <- function (e)  
-	paste( c(as.character(e), 
+.ecor.stackTrace <- function (e) {
+	ef <- getAnywhere("errframes")
+	ef <- ef$objs[which(ef$where==".GlobalEnv")]
+	
+	if ( length(ef)==1) {
+		paste( c(as.character(e), 
 					"frame stack: ",
-					names(errframes)),
+					names(ef)),
 			collapse = "\n") 
-
+	} else {
+		as.character(e)
+	}
+}
 
 .ecor.tasksetup <- function ( jconf, hconffile, mapsetup=T ) {
-	
-	options(error=quote(dump.frames("errframes", F)))
 	
 	tryCatch({
 				hconf <- NULL 
@@ -540,8 +604,6 @@ ecor.HJob <- setRefClass("HJob",
 				if ( length(ecor$hconf$reducefun)==0) 
 					stop("R reducer not configured. Perhaps you wanted to do map-only job?")
 				
-				stop("in reducer")
-				
 				vals <- list()
 				len <- 0L
 				
@@ -549,8 +611,8 @@ ecor.HJob <- setRefClass("HJob",
 				
 				while (.jcall(jvalueIter,"Z","hasNext")) {
 					bw <- .jcall(jvalueIter,"Ljava/lang/Object;","next")
-					v <- .jcall(bw,"[B",getBytes,evalArray=T)
-					l <- .jcall(bw,"I", getLength,simplify=T)
+					v <- .jcall(bw,"[B","getBytes",evalArray=T)
+					l <- .jcall(bw,"I", "getLength",simplify=T)
 					len <- len +1L 
 					vals [[len]] <- unserialize(v[1:l])
 				}
@@ -562,6 +624,19 @@ ecor.HJob <- setRefClass("HJob",
 	)
 }
 
+#' @title 
+#' Collect key and values from R tasks
+#' 
+#' @description 
+#' Collect keys and values from R tasks. 
+#' 
+#' @details 
+#' Currently, key is coerced with as.character() and 
+#' saved as Text writable. Value is R-serialized and saved 
+#' as BytesWritable.
+#' 
+#' @param key key (will be coerced to a character vector of length 1)
+#' @param value R object to be serialized 
 ecor.collect <- function (key, value) {
 
 	jkey <- as.character(key)

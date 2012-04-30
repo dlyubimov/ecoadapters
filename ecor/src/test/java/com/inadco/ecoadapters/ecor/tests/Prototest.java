@@ -18,7 +18,8 @@ public class Prototest {
 //        j.setReducerClass(null);
 //        j.setMapOutputKeyClass(theClass))
 //        Text ;
-//        BytesWritable
+//        BytesWritable bw = null;
+        
         
     }
 

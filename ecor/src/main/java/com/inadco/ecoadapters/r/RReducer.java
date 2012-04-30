@@ -10,6 +10,16 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.rosuda.JRI.REXP;
 import org.rosuda.JRI.Rengine;
 
+/**
+ * This reducer works with stuff output by {@link RMapper}. i.e. it assumes text
+ * keys and BytesWritable's with serialized R object content.
+ * 
+ * Also, it will expect to outuput Text keys and BytesWritable containing
+ * serialized R objects (same as {@link RMapper}).
+ * 
+ * @author dmitriy
+ * 
+ */
 public class RReducer extends Reducer<Text, BytesWritable, Writable, Writable> {
 
     private Rengine    engine;
@@ -41,7 +51,7 @@ public class RReducer extends Reducer<Text, BytesWritable, Writable, Writable> {
     protected void reduce(Text keyIn, Iterable<BytesWritable> values, Context ctx) throws IOException,
         InterruptedException {
         engine.assign("hkey", keyIn.toString());
-        engine.assign("hjvaliter", engine.createRJavaRef(values));
+        engine.assign("hjvaliter", engine.createRJavaRef(values.iterator()));
 
         REXP r = engine.eval("freduce(hjconf, hkey, hjvaliter)");
 
@@ -59,7 +69,8 @@ public class RReducer extends Reducer<Text, BytesWritable, Writable, Writable> {
             break;
         default:
             throw new IOException(
-                String.format("failed to communicate to reduce task properly, unsupported type %d returned.", r.getType()));
+                String.format("failed to communicate to reduce task properly, unsupported type %d returned.",
+                              r.getType()));
         }
         try {
             collector.outputToContext(ctx);
