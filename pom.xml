@@ -31,6 +31,17 @@
       </releases>
     </repository>
 
+    <repository>
+      <id>central</id>
+      <url>http://repo1.maven.org/maven2</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+
     <!-- this is specifically for rJava R distribution jars only which are 
       not currently pulished in maven public repos afaik. -->
     <repository>
@@ -85,7 +96,7 @@
         <hadoop.version>0.20.2-cdh3u3</hadoop.version>
 
         <!--CDH3b3, preferred over stumbleupon's -->
-        <hbase.version>0.90.4-cdh3u3</hbase.version>
+        <hbase.version>0.92.1</hbase.version>
         <protobuf.version>2.4.1</protobuf.version>
         <!-- for tests, 3rd party protobuf serialization into json, xml -->
         <protobuf-java-format.version>1.2</protobuf-java-format.version>
