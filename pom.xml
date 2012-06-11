@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
   <!-- Copyright © 2010, 2011 Inadco, Inc. All rights reserved. Licensed 
     under the Apache License, Version 2.0 (the "License"); you may not use this 
@@ -23,6 +24,17 @@
     <repository>
       <id>cloudera</id>
       <url>https://repository.cloudera.com/artifactory/simple/repo</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+
+    <repository>
+      <id>central</id>
+      <url>http://repo1.maven.org/maven2</url>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
@@ -82,10 +94,14 @@
       </activation>
 
       <properties>
+        <!--CDH3b3, preferred over stumbleupon's -->
         <hadoop.version>0.20.2-cdh3u3</hadoop.version>
 
-        <!--CDH3b3, preferred over stumbleupon's -->
-        <hbase.version>0.90.4-cdh3u3</hbase.version>
+        <!-- out-of-cdh version, unfortunately doesn't have dependencyManagementn 
+          defined to re-import all versions -->
+        <hbase.version>0.92.1</hbase.version>
+        <zookeeper.version>3.4.3</zookeeper.version>
+
         <protobuf.version>2.4.1</protobuf.version>
         <!-- for tests, 3rd party protobuf serialization into json, xml -->
         <protobuf-java-format.version>1.2</protobuf-java-format.version>
@@ -278,6 +294,12 @@
         <version>${hbase.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.zookeeper</groupId>
+        <artifactId>zookeeper</artifactId>
+        <version>${zookeeper.version}</version>
       </dependency>
 
       <dependency>
