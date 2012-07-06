@@ -66,7 +66,17 @@ NULL
 	
 	ecor <- new.env()
 	
-	hadoopcp <- ecor.hadoopClassPath()
+	hadoopcp <- ""
+
+	tryCatch(
+			# Test for hadoop already being present in outer classloader
+			# in case we are called up from JRI
+			
+				J("org.apache.hadoop.conf.Configuration"),
+				error={
+					hadoopcp <<- ecor.hadoopClassPath()
+				}
+			)
 	
 	if ( pkgInit ) {
 		options(error=quote(dump.frames("errframes", F)))
