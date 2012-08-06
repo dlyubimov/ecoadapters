@@ -15,7 +15,8 @@ when optimizing for performance)
 * inline reading of an hbase value as bytes or protobuf message from hbase (HBaseGet)
 * protobuf mapping to a (lazy or non-lazy) R lists. Running R closures in a MapReduce tasks 
   (similar to R-Hadoop) but specifically adapting to sequence files with encapsulated 
-  protobuf messages.
+  protobuf messages. More detail on this comes with the help of "ecor" R package contained 
+  here in "ecor" maven module. 
 * misc 
 
 Mainly, it enables projection of attributes, nesting of messages and mapping 
@@ -149,7 +150,9 @@ the 0.3.2-SNAPSHOT. 0.3.1 was released and tagged and contained CDH3b4 dependenc
 
 Current HEAD is at CDH3u3.
 
-R stuff was developed and tested  on R 2.13 and 2.14 
+R stuff was developed and tested  on R 2.13 and 2.14. in order to compile "ecor" module 
+yourself, you'd need R 2.14 and a number of (fairly basic) packages that R package 
+declares dependencies on. 
 
 We also verified these functions with standard apache releases, it's just what we currently use 
 those with. 
