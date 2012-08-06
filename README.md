@@ -162,7 +162,7 @@ Maven Repo
 Starting with release 0.3.12, i am also publishing release (and sometimes snapshot) artifacts. 
 Here's repo url to use : 
 
-   <repository>
+    <repository>
       <id>dlyubimov-maven-repo-releases</id>
       <url>https://github.com/dlyubimov/dlyubimov-maven-repo/raw/master/releases</url>
      <snapshots>    
