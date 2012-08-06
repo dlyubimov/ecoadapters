@@ -14,7 +14,8 @@ when optimizing for performance)
 * read hadoop sequence files with protobuf messags using hive
 * inline reading of an hbase value as bytes or protobuf message from hbase (HBaseGet)
 * protobuf mapping to a (lazy or non-lazy) R lists. Running R closures in a MapReduce tasks 
-  (similar to R-Hadoop) but over a sequence files with encapsulated protobuf messages.
+  (similar to R-Hadoop) but specifically adapting to sequence files with encapsulated 
+  protobuf messages.
 * misc 
 
 Mainly, it enables projection of attributes, nesting of messages and mapping 
