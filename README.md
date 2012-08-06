@@ -184,6 +184,10 @@ Here's repo url to use :
     </repository>
 
 
+Hint: It may be also useful to explore that project if you want to download R package 
+releases and have trouble to adjust R setup to compile them yourself. 
+
+
 License 
 ------- 
 Apache 2.0
