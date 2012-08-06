@@ -13,6 +13,8 @@ What it can do:
 when optimizing for performance)
 * read hadoop sequence files with protobuf messags using hive
 * inline reading of an hbase value as bytes or protobuf message from hbase (HBaseGet)
+* protobuf mapping to a (lazy or non-lazy) R lists. Running R closures in a MapReduce tasks 
+  (similar to R-Hadoop) but over a sequence files with encapsulated protobuf messages.
 * misc 
 
 Mainly, it enables projection of attributes, nesting of messages and mapping 
@@ -143,6 +145,10 @@ Dependencies
 
 HBase, Hadoop, Hive and Pig dependencies are now set to those in Cloudera release CDH3u0 at 
 the 0.3.2-SNAPSHOT. 0.3.1 was released and tagged and contained CDH3b4 dependencies. 
+
+Current HEAD is at CDH3u3.
+
+R stuff was developed and tested  on R 2.13 and 2.14 
 
 We also verified these functions with standard apache releases, it's just what we currently use 
 those with. 
