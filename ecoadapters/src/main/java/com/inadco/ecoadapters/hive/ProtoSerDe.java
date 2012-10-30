@@ -230,8 +230,8 @@ public class ProtoSerDe implements SerDe {
             return protoMsg2Hive(msgField, fd.getMessageType());
         case BYTES:
             byte[] val = ((ByteString) src).toByteArray();
-            // we convert to string using %X formatting 
-            return String.format("%X", new BigInteger(1, val));
+            // we convert to string using %X formatting
+            return getHexString(val);
         case BOOL:
         case DOUBLE:
 
@@ -273,6 +273,14 @@ public class ProtoSerDe implements SerDe {
 
         return result;
 
+    }
+
+    private static String getHexString(byte[] b) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < b.length; i++) {
+           result.append(Integer.toString((b[i] & 0xff) + 0x100, 16).substring(1));
+        }
+        return result.toString().toUpperCase();
     }
 
 }
