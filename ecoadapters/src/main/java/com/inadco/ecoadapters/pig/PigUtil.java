@@ -29,6 +29,7 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
+import org.apache.pig.data.BinSedesTuple;
 import org.apache.pig.data.DataBag;
 import org.apache.pig.data.DataByteArray;
 import org.apache.pig.data.DataType;
@@ -507,7 +508,19 @@ public class PigUtil {
 
         @Override
         public byte[] toHbase(Object pigVal) {
-            DataByteArray dba = (DataByteArray) pigVal;
+        	DataByteArray dba = null;
+        	
+        	try {
+        		dba = (DataByteArray) pigVal;
+        	} catch(Exception e) {
+        		BinSedesTuple tuple = (BinSedesTuple)pigVal;
+        		try {
+					dba = (DataByteArray) (tuple.get(0));
+				} catch (ExecException e1) {
+					
+				}
+        	}
+            
             if (dba == null)
                 return null;
             return dba.get();
