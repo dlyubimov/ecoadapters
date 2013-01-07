@@ -24,9 +24,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
@@ -282,5 +284,13 @@ public class ProtoSerDe implements SerDe {
         }
         return result.toString().toUpperCase();
     }
+
+	@Override
+	public SerDeStats getSerDeStats() {
+		// TODO Auto-generated method stub
+		//		return null;
+		throw new NotImplementedException();
+		
+	}
 
 }

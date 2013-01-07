@@ -70,10 +70,15 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-core</artifactId>
     </dependency>
+    
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
 
     <!-- causes weird compilation problems. not sure why. -->
     <!-- dependency>
-      <groupId>org.apache..hadoop</groupId>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-core</artifactId>
       <classifier>sources</classifier>
       <scope>runtime</scope>
@@ -105,7 +110,7 @@
 
     <!-- hive -->
     <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
+      <groupId>org.apache.hive</groupId>
       <artifactId>hive-serde</artifactId>
       <optional>true</optional>
     </dependency>
