@@ -13,7 +13,7 @@
 
   <groupId>com.inadco.ecoadapters</groupId>
   <artifactId>ecoadapters-parent</artifactId>
-  <version>0.4.3</version>
+  <version>0.4.4-SNAPSHOT</version>
   <name>Inadco :: Ecoadapters :: Parent </name>
 
   <packaging>pom</packaging>
