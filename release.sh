@@ -6,8 +6,9 @@
 
 . ./branch.sh
 
-MVN_GITHUB_RELEASE_REPO=releases::default::file:../dlyubimov-maven-repo/releases
-MVN_GITHUB_SNAPSHOT_REPO=snapshots::default::file:../dlyubimov-maven-repo/snapshots
+# set those in environment where the actual repo snapshot lies 
+# MVN_GITHUB_RELEASE_REPO=releases::default::file:/home/dmitriy/projects/github/dlyubimov-maven-repo/releases
+# MVN_GITHUB_SNAPSHOT_REPO=snapshots::default::file:/home/dmitriy/projects/github./dlyubimov-maven-repo/snapshots
 
 git checkout $DEV_BRANCH && git pull $REMOTE && \
 git checkout -b $REL_BRANCH-$REL_VERSION && git push -u $REMOTE $REL_BRANCH-$REL_VERSION  && \
