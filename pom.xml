@@ -13,7 +13,7 @@
 
   <groupId>com.inadco.ecoadapters</groupId>
   <artifactId>ecoadapters-parent</artifactId>
-  <version>0.4.3-SNAPSHOT</version>
+  <version>0.5.0-SNAPSHOT</version>
   <name>Inadco :: Ecoadapters :: Parent </name>
 
   <packaging>pom</packaging>
@@ -93,7 +93,7 @@
       </activation>
 
       <properties>
-        <!--CDH3b3, preferred over stumbleupon's -->
+        <!--CDH4 -->
         <hadoop.version>2.0.0-mr1-cdh4.1.2</hadoop.version>
 
         <!-- out-of-cdh version, unfortunately doesn't have dependencyManagementn 
