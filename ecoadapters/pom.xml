@@ -131,6 +131,45 @@
     </dependency>
 
 
+    <!-- cascading -->
+    <dependency>
+      <groupId>cascading</groupId>
+      <artifactId>cascading-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>cascading</groupId>
+      <artifactId>cascading-core</artifactId>
+      <scope>provided</scope>
+      <classifier>sources</classifier>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>cascading</groupId>
+      <artifactId>cascading-platform</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>cascading</groupId>
+      <artifactId>cascading-platform</artifactId>
+      <scope>provided</scope>
+      <optional>true</optional>
+      <classifier>sources</classifier>
+    </dependency>
+
+    <dependency>
+      <groupId>cascading</groupId>
+      <artifactId>cascading-hadoop</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>cascading</groupId>
+      <artifactId>cascading-hadoop</artifactId>
+      <scope>provided</scope>
+      <classifier>sources</classifier>
+    </dependency>
+
     <!-- test -->
     <dependency>
       <groupId>org.testng</groupId>
