@@ -57,10 +57,11 @@ import java.io.IOException;
  */
 public final class ProtoScheme extends SequenceFile {
 
-    private Descriptors.Descriptor m_msgDesc;
-    private CascadingTupleMap m_tupleMap;
-    private Text m_outKey = new Text();
-
+    private transient Descriptors.Descriptor m_msgDesc;
+    private transient CascadingTupleMap m_tupleMap;
+    private transient Text m_outKey = new Text();
+    private String className;
+    
     /**
      * Same message descriptor as with pig and hive etc. adapters.
      * I.e. either class name or hdfs reference to the descirptor file + ?msg="message".
@@ -71,7 +72,10 @@ public final class ProtoScheme extends SequenceFile {
      * @throws IOException
      */
     public ProtoScheme(String msgDescString) throws IOException {
-        super();
+        super(new Fields());
+        
+        className = msgDescString;
+        
         try {
             if (msgDescString.startsWith("hdfs://"))
                 m_msgDesc = EcoUtil.inferDescriptorFromFilesystem(msgDescString);
@@ -87,16 +91,31 @@ public final class ProtoScheme extends SequenceFile {
         setSourceFields(new Fields(fnames));
         setSinkFields(new Fields(fnames));
 
-
     }
-
-    public static void main(String[] args) {
-        System.out.printf("%d\n", new Fields(new String[]{"a", "B"}).size());
+    
+    private void init() {
+    	if(m_msgDesc == null) {
+    		try {
+            	if (className.startsWith("hdfs://"))
+                	m_msgDesc = EcoUtil.inferDescriptorFromFilesystem(className);
+            	else
+            		m_msgDesc = EcoUtil.inferDescriptorFromClassName(className);
+        	} catch (Throwable e) {
+        		throw new RuntimeException("Error initializing ProtoScheme ",e);
+        	}
+        	m_tupleMap = new CascadingTupleMap(m_msgDesc);
+        	String[] fnames = m_tupleMap.getFieldNames();
+        	m_outKey = new Text();
+        
+        	setSourceFields(new Fields(fnames));
+        	setSinkFields(new Fields(fnames));
+    	}
     }
 
     @Override
     public void sourcePrepare(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall) {
         super.sourcePrepare(flowProcess, sourceCall);
+        init();
         if (!(sourceCall.getContext()[1] instanceof BytesWritable))
             throw new RuntimeException(
                     "Cascading adapter for protobuff sequence files requires BytesWritable as file value type");
@@ -105,6 +124,7 @@ public final class ProtoScheme extends SequenceFile {
     @Override
     public void sinkConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         super.sinkConfInit(flowProcess, tap, conf);
+        init();
         conf.setOutputKeyClass(Text.class);
         conf.setOutputValueClass(BytesWritable.class);
     }
@@ -113,6 +133,7 @@ public final class ProtoScheme extends SequenceFile {
     @SuppressWarnings("unchecked")
     public void sinkPrepare(FlowProcess<JobConf> flowProcess, SinkCall<Void, OutputCollector> sinkCall) throws IOException {
         super.sinkPrepare(flowProcess, sinkCall);
+        init();
         ((SinkCall) sinkCall).setContext(new BytesWritable());
     }
 

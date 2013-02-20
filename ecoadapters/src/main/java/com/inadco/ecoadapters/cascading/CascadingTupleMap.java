@@ -285,8 +285,12 @@ final class CascadingTupleMap {
                     b.addRepeatedField(fd, boo);
                 break;
             case STRING:
-                for (String boo : (String[]) src)
-                    b.addRepeatedField(fd, boo);
+                try {
+                	for (String boo : (String[]) src)
+                		b.addRepeatedField(fd, boo);
+                } catch(Exception e) {
+                	b.addRepeatedField(fd, (String)src);
+                }
                 break;
             case ENUM:
                 Descriptors.EnumDescriptor ed = fd.getEnumType();
