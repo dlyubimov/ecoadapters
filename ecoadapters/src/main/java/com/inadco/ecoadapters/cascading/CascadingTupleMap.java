@@ -82,8 +82,7 @@ final class CascadingTupleMap {
         if (msg == null) return null;
         // efficiency killer, i guess..
         // oh well, it started with the protobuf anyway
-        if (holder == null) holder = new Tuple();
-        else holder.clear();
+
         for (Map.Entry<Descriptors.FieldDescriptor, Object> entry : msg.getAllFields().entrySet()) {
             Descriptors.FieldDescriptor fd = entry.getKey();
             Object val = entry.getValue();
