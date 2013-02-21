@@ -46,7 +46,10 @@ Hive external table using Hive's SerDe.
 Serialization (i.e. storing back into a sequence file) is not supported. 
 Usually one can reprocess this into a native hive table or run ad-hoc analytical queries.
 
-#### Pig (0.7.0, 0.8.0). 
+Branch 0.5  now track CDH4 dependencies so now it is Hive 0.9 (or even 0.10) but there are 
+no known incompatibilities with older versions.
+
+#### Pig (0.10). 
 
 * reading protobuf messages packed as values from a SequenceFile(s) with protobuf messages 
 packed same way as above (BytesWritable values). 
@@ -57,6 +60,8 @@ packed same way as above (BytesWritable values).
 but I used compiled 0.2 jar with pig 0.8.0 too so compiled artifact should stay compatible with pig 0.8.0 and 
 0.7.0 until we hit some incompabitibilty between 0.7.0 and 0.8.0 trees at which point one looking for 0.7.0 compatible 
 artifact should probably should go back to ecoadapters-0.2. (releases are marked with tags). 
+* branch 0.5.x now tracks CDH4 dependencies which contains pig 0.10. There are some internal pig changes 
+that render previous pig releases incompatible with this branch.
 
 #### example: reading protobuf messages from sequence files into pig script: 
 
@@ -138,6 +143,12 @@ grammar and I just extened this by
 
 where proto-spec grammar is given earlier).
 
+#### Cascading 
+
+*ProtoScheme* class handles Cascading scheme for writing/reading sequence files with protobuf value payload.
+Unfortunately, cascading doesn't support notion of bags (repeated fields) or nested message schemas so only 
+first layer (outer message) is adapated. The mapping of the rest is per javadoc.
+
    
 
 Dependencies
@@ -145,10 +156,10 @@ Dependencies
 
 #### HBase, Hadoop, Pig
 
-HBase, Hadoop, Hive and Pig dependencies are now set to those in Cloudera release CDH3u0 at 
-the 0.3.2-SNAPSHOT. 0.3.1 was released and tagged and contained CDH3b4 dependencies. 
+HBase, Hadoop, Hive and Pig dependencies are now set to those in Cloudera release CDH4.1.2 at 
+the 0.5.0-SNAPSHOT. 
 
-Current HEAD is at CDH3u3.
+Current HEAD is at CDH4. Migration to CDH4 releases is still in progress, please note any incompatibilities to us.
 
 R stuff was developed and tested  on R 2.13 and 2.14. in order to compile "ecor" module 
 yourself, you'd need R 2.14 and a number of (fairly basic) packages that R package 
