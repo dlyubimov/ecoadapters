@@ -198,6 +198,10 @@ Here's repo url to use :
 Hint: It may be also useful to explore that project if you want to download R package 
 releases and have trouble to adjust R setup to compile them yourself. 
 
+All releases (which are believed to be more or less stable and often actually run in production environment) are tagged. 
+The tag names correspond to release maven version. So to check what versions are available in maven, check 
+the tags. 
+
 
 License 
 ------- 
