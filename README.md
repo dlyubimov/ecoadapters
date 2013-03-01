@@ -17,6 +17,8 @@ when optimizing for performance)
   (similar to R-Hadoop) but specifically adapting to sequence files with encapsulated 
   protobuf messages. More detail on this comes with the help of "ecor" R package contained 
   here in "ecor" maven module. 
+* some rudimentary "Scheme" support for Cascading helping to read and write sequence files with 
+  a protobuf payload. 
 * misc 
 
 Mainly, it enables projection of attributes, nesting of messages and mapping 
@@ -200,7 +202,7 @@ releases and have trouble to adjust R setup to compile them yourself.
 
 All releases (which are believed to be more or less stable and often actually run in production environment) are tagged. 
 The tag names correspond to release maven version. So to check what versions are available in maven, check 
-the tags. 
+the tags. **The HEAD is almost always unstable.**
 
 
 License 
