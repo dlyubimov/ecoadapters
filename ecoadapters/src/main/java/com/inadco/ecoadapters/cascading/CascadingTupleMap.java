@@ -18,6 +18,7 @@
  */
 package com.inadco.ecoadapters.cascading;
 
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
@@ -60,18 +61,30 @@ final class CascadingTupleMap {
         return fnames;
     }
 
-    public Message.Builder t2proto(Tuple t) throws IOException {
+    public Message.Builder t2proto(Tuple t, Fields f) throws IOException {
         if (t == null) return null;
         Message.Builder b = this.b.clone();
         int i = 0;
         for (Descriptors.FieldDescriptor fd : tupleMaps) {
-            if (fd.isRepeated())
-                repeatedC2P(b, fd, t, i);
-            else {
-                Object o = simpleC2P(fd, t, i);
-                if (o != null)
-                    b.setField(fd, o);
-            }
+        	int pos = -1;
+        	try {
+        		pos = f.getPos(fd.getName());
+        	} catch(Exception e) {
+        		
+        	}
+        	
+        	if(pos == -1 && fd.isRequired()) {
+        		throw new IOException("Required field missing "+fd.getName()+":"+fd.getFullName());
+        	} else if(pos != -1) {
+        	
+	            if (fd.isRepeated())
+	                repeatedC2P(b, fd, t, pos);
+	            else {
+	                Object o = simpleC2P(fd, t, pos);
+	                if (o != null)
+	                    b.setField(fd, o);
+	            }
+        	}
 
             i++;
         }
@@ -318,7 +331,7 @@ final class CascadingTupleMap {
         Object obj = null;
         switch (fd.getType()) {
             case BOOL:
-                obj = t.getBoolean(ind);
+                try { obj = t.getBoolean(ind); } catch(Exception e) { obj = new Boolean(false); }
                 break;
             case BYTES:
                 obj = (byte[]) t.getObject(ind);
@@ -331,7 +344,7 @@ final class CascadingTupleMap {
             case UINT32:
             case INT32:
             case FIXED32:
-                obj = t.getInteger(ind);
+                try { obj = t.getInteger(ind); } catch(Exception e) { obj = new Integer(0); };
                 break;
 
             case SINT64:
@@ -339,17 +352,17 @@ final class CascadingTupleMap {
             case INT64:
             case UINT64:
             case FIXED64:
-                obj = t.getLong(ind);
+                try { obj = t.getLong(ind); } catch(Exception e) { obj = new Long(0);}
                 break;
 
             case FLOAT:
-                obj = t.getFloat(ind);
+                try { obj = t.getFloat(ind); } catch(Exception e) { obj = new Float(0.0f); }
                 break;
             case STRING:
                 obj = t.getString(ind);
                 break;
             case ENUM:
-                obj = fd.getEnumType().findValueByName(t.getString(ind));
+                try { obj = fd.getEnumType().findValueByName(t.getString(ind)); } catch(Exception e) { obj = fd.getEnumType().findValueByNumber(0); }
                 break;
             case MESSAGE:
                 // well, if it is message, we expect it to be Message for cascading case.

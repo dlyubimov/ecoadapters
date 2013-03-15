@@ -306,7 +306,7 @@ public class PigUtil {
         // return new FieldSchema(fd.getName(), new Schema(
         // inferNonrepeatedFieldSchema(fd)), DataType.BAG);
 
-        FieldSchema bagSchema = new FieldSchema(fd.getName(), DataType.BAG);
+        FieldSchema bagSchema = new FieldSchema(fd.getName(), DataType.TUPLE);
 
         FieldSchema contentSchema = inferNonrepeatedFieldSchema(fd);
         if (contentSchema.type == DataType.TUPLE && contentSchema.schema != null) { // sub-tuple
