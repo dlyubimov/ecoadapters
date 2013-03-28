@@ -61,9 +61,9 @@ NULL
 .ecor.init <- function(libname=NULL, pkgname=NULL, pkgInit = F) {
 	
 	library(rJava)
-	
-	if ( length(pkgname) == 0 ) pkgname <- "ecor"
-	
+
+	if ( is.null(pkgname) ) pkgname <- "ecor"
+
 	ecor <- new.env()
 	
 	hadoopcp <- ""
@@ -71,15 +71,23 @@ NULL
 	tryCatch(
 			# Test for hadoop already being present in outer classloader
 			# in case we are called up from JRI
-			
-				J("org.apache.hadoop.conf.Configuration"),
-				error={
+			{
+				J("org.apache.hadoop.conf.Configuration")
+    		},
+
+				error= function(e) {
 					hadoopcp <<- ecor.hadoopClassPath()
 				}
 			)
-	
+
+
+
+
 	if ( pkgInit ) {
 		options(error=quote(dump.frames("errframes", F)))
+
+		#debug
+		cat("Using hadoop classpath:",hadoopcp, "\n")
 		
 		.jpackage(pkgname, morePaths = hadoopcp, lib.loc = libname)
 		cp <- list.files(system.file("java",package=pkgname,lib.loc=libname),
@@ -103,7 +111,7 @@ NULL
 		
 	}
 	
-	# make sure all classpath entries exists, 
+	# make sure all classpath entries exists,
 	# it may cause problems later.
 	ecor$cp <- ecor$cp[file.exists(ecor$cp)]
 	
@@ -147,38 +155,41 @@ NULL
 ecor.hadoopClassPath <- function () {
 	# TODO: use hadoop classpath to establish classpath instead.
 	hhome <- Sys.getenv("HADOOP_HOME")
-	
+
 	if ( nchar(hhome) ==0 )
 		stop ("HADOOP_HOME not set")
-	
-	hlibdir <- file.path (hhome, "lib")
-	if ( ! file.exists(hlibdir))
-		stop ( sprintf("cannot find %s directory.", hlibdir))
-	
-	
-	hadooplib <- list.files(
-			hlibdir,
-			full.names = T,
-			pattern="\\.jar$")
-	
-	hadoopcore <- list.files (
-			hhome,
-			full.names=T,
-			pattern=".*core.*\\.jar"
-	)
-	# ensure config is loaded form 
-	# the client dir 
-	hadoopconf <- file.path(hhome,"conf")
-	if ( ! file.exists(hadoopconf) )
-		stop ("Unable to find hadoop configuration files.")
-	
-	c(hadooplib, hadoopcore, hadoopconf)
+#
+#	hlibdir <- file.path (hhome, "lib")
+#	if ( ! file.exists(hlibdir))
+#		stop ( sprintf("cannot find %s directory.", hlibdir))
+#
+#
+#	hadooplib <- list.files(
+#			hlibdir,
+#			full.names = T,
+#			pattern="\\.jar$")
+#
+#	hadoopcore <- list.files (
+#			hhome,
+#			full.names=T,
+#			pattern=".*core.*\\.jar"
+#	)
+#	# ensure config is loaded form
+#	# the client dir
+#	hadoopconf <- file.path(hhome,"conf")
+#	if ( ! file.exists(hadoopconf) )
+#		stop ("Unable to find hadoop configuration files.")
+#
+#	c(hadooplib, hadoopcore, hadoopconf)
 	
 	# this doesn't quite work yet. switch back to HADOOP_HOME
-#	hcp <- strsplit(system("hadoop classpath",intern=T),":|;")
-#	if ( length(hcp) == 0 )
-#		stop ("Can't execute \"hadoop classpath\" successfully.");
-#	hcp
+	hcp <- unlist(strsplit(system(
+	    paste(file.path(hhome,"bin","hadoop"),"classpath"),intern=T),":|;"))
+	if ( length(hcp) == 0 )
+		stop ("Can't execute \"hadoop classpath\" successfully.");
+
+    hcp
+
 }
 
 #' Produce local hbase path
