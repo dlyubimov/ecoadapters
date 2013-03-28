@@ -180,17 +180,19 @@ final class CascadingTupleMap {
 
                 break;
             case STRING:
-                String[] sarr = new String[lval.size()];
+                Tuple tp = Tuple.size(lval.size());
                 i = 0;
+                
                 for (Object o : lval) {
-                    sarr[i] = (String) o;
+                    tp.setString(i,(String)o);
                     i++;
                 }
-                tupleTo.set(ind, sarr);
+                
+                tupleTo.set(ind, tp);
 
                 break;
             case ENUM:
-                sarr = new String[lval.size()];
+                String[] sarr = new String[lval.size()];
                 i = 0;
                 for (Object o : lval) {
                     sarr[i] = ((Descriptors.EnumValueDescriptor) o).getName();
@@ -298,8 +300,10 @@ final class CascadingTupleMap {
                 break;
             case STRING:
                 try {
-                	for (String boo : (String[]) src)
-                		b.addRepeatedField(fd, boo);
+                    Tuple tmpt = (Tuple)src;
+                    for(int k=0;k<tmpt.size();k++) {
+                        b.addRepeatedField(fd, tmpt.getString(k));
+                    }
                 } catch(Exception e) {
                 	b.addRepeatedField(fd, (String)src);
                 }
