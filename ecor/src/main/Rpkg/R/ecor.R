@@ -61,33 +61,34 @@ NULL
 .ecor.init <- function(libname=NULL, pkgname=NULL, pkgInit = F) {
 	
 	library(rJava)
-
+	
 	if ( is.null(pkgname) ) pkgname <- "ecor"
-
+	
 	ecor <- new.env()
 	
 	hadoopcp <- ""
-
+	
+	options(show.error.messages=F)
 	tryCatch(
 			# Test for hadoop already being present in outer classloader
-			# in case we are called up from JRI
+			# in case we are called up from JRI.
+			# unfortunately this still emits the spooky error message 
+			# during package installation. Not sure how to prevent it from 
+			# happening. R exception handling is somehow peculiar.
 			{
 				J("org.apache.hadoop.conf.Configuration")
-    		},
-
-				error= function(e) {
-					hadoopcp <<- ecor.hadoopClassPath()
-				}
-			)
-
-
-
-
+			},
+			error= function(e) {
+				hadoopcp <<- ecor.hadoopClassPath()
+			}
+	)
+	options(show.error.messages=T)
+	
 	if ( pkgInit ) {
 		options(error=quote(dump.frames("errframes", F)))
-
+		
 		#debug
-		cat("Using hadoop classpath:",hadoopcp, "\n")
+		#cat("Using hadoop classpath:",hadoopcp, "\n")
 		
 		.jpackage(pkgname, morePaths = hadoopcp, lib.loc = libname)
 		cp <- list.files(system.file("java",package=pkgname,lib.loc=libname),
@@ -132,8 +133,8 @@ NULL
 	consts["INPUT"] <- "mapred.input.dir"
 	consts["OUTPUT"] <- "mapred.output.dir"
 	consts["MAPOUTPUTKEY_CLASS"] <- "mapred.mapoutput.key.class"
-    consts["MAPOUTPUTVALUE_CLASS"] <- "mapred.mapoutput.value.class"
-    consts["OUTPUTKEY_CLASS"] <- "mapred.output.key.class"
+	consts["MAPOUTPUTVALUE_CLASS"] <- "mapred.mapoutput.value.class"
+	consts["OUTPUTKEY_CLASS"] <- "mapred.output.key.class"
 	consts["OUTPUTVALUE_CLASS"] <- "mapred.output.value.class"
 	consts["REDUCE_TASKS"] <- "mapred.reduce.tasks"
 	
@@ -155,16 +156,16 @@ NULL
 ecor.hadoopClassPath <- function () {
 	# TODO: use hadoop classpath to establish classpath instead.
 	hhome <- Sys.getenv("HADOOP_HOME")
-
+	
 	if ( nchar(hhome) ==0 )
 		stop ("HADOOP_HOME not set")
 	
 	# this doesn't quite work yet. switch back to HADOOP_HOME
 	hcp <- unlist(strsplit(system(
-	    paste(file.path(hhome,"bin","hadoop"),"classpath"),intern=T),":|;"))
+							paste(file.path(hhome,"bin","hadoop"),"classpath"),intern=T),":|;"))
 	if ( length(hcp) == 0 )
 		stop ("Can't execute \"hadoop classpath\" successfully.");
-    .expandClassPath(hcp)
+	.expandClassPath(hcp)
 }
 
 .expandClassPath <- function (cp) {
@@ -174,12 +175,12 @@ ecor.hadoopClassPath <- function () {
 	withPatterns <- grep ("\\*",cp)
 	notPatterns <- which(!(1:length(cp))%in%withPatterns)
 	expandedJars <- unlist(sapply(cp[withPatterns], function(pat) {
-				d <- dirname(pat)
-				list.files(d,"*.jar", full.names=T)
-			}))
+						d <- dirname(pat)
+						list.files(d,"*.jar", full.names=T)
+					}))
 	c(cp[notPatterns],expandedJars)
 }
-	
+
 
 #' Produce local hbase path
 #' 
@@ -309,28 +310,28 @@ ecor.MR <- function(input, output, MAPFUN, REDUCEFUN = NULL, MAPSETUPFUN = NULL,
 #' @method initialize HConf
 #' @param jconf rJava reference to \code{o.a.h.conf.Configuration}
 initialize.HConf <- function (jconf=NULL) {
-  
-  props <<- character(0)
-  
-  if ( length(jconf)>0) {
-    iter <- jconf$iterator()
-    while (iter$hasNext() ) { 
-      map.entry <- iter$`next`()
-      props[as.character(map.entry$getKey())] <<- as.character(map.entry$getValue())
-    }
-  }
-  props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
-  props[ecor$consts["REDUCE"]] <<- "com.inadco.ecoadapters.r.RReducer"
-  props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
-  props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
-  
-  props[ecor$consts["MAPOUTPUTKEY_CLASS"]] <<- "org.apache.hadoop.io.Text"
-  props[ecor$consts["MAPOUTPUTVALUE_CLASS"]] <<- "org.apache.hadoop.io.BytesWritable"
-
-  props[ecor$consts["OUTPUTKEY_CLASS"]] <<- "org.apache.hadoop.io.Text"
-  props[ecor$consts["OUTPUTVALUE_CLASS"]] <<- "org.apache.hadoop.io.BytesWritable"
-  
-  hname <<- "R-Job"
+	
+	props <<- character(0)
+	
+	if ( length(jconf)>0) {
+		iter <- jconf$iterator()
+		while (iter$hasNext() ) { 
+			map.entry <- iter$`next`()
+			props[as.character(map.entry$getKey())] <<- as.character(map.entry$getValue())
+		}
+	}
+	props[ecor$consts["MAP"]] <<- "com.inadco.ecoadapters.r.RMapper"
+	props[ecor$consts["REDUCE"]] <<- "com.inadco.ecoadapters.r.RReducer"
+	props[ecor$consts["INPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat"
+	props[ecor$consts["OUTPUT_FORMAT"]] <<- "org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat"
+	
+	props[ecor$consts["MAPOUTPUTKEY_CLASS"]] <<- "org.apache.hadoop.io.Text"
+	props[ecor$consts["MAPOUTPUTVALUE_CLASS"]] <<- "org.apache.hadoop.io.BytesWritable"
+	
+	props[ecor$consts["OUTPUTKEY_CLASS"]] <<- "org.apache.hadoop.io.Text"
+	props[ecor$consts["OUTPUTVALUE_CLASS"]] <<- "org.apache.hadoop.io.BytesWritable"
+	
+	hname <<- "R-Job"
 }
 
 #' convert to rJava \code{o.a.h}
@@ -386,12 +387,12 @@ setReduceTasks.HConf <- function (value) props[ecor$consts["REDUCE_TASKS"]] <<- 
 #' 
 ecor.HConf <- setRefClass("HConf", 
 		fields=list(props="character",
-		mapsetupfun = "function",
-        mapfun="function",
-		reducesetupfun="function",
-		reducefun="function",
-		namespaces="character",
-        hname="character"),
+				mapsetupfun = "function",
+				mapfun="function",
+				reducesetupfun="function",
+				reducefun="function",
+				namespaces="character",
+				hname="character"),
 		methods=list(
 				initialize =initialize.HConf,
 				as.jconf =as.jconf.HConf,
@@ -410,12 +411,12 @@ ecor.HConf <- setRefClass("HConf",
 				setInput = setInput.HConf,
 				getInput = getInput.HConf,
 				setReduceTasks = setReduceTasks.HConf,
-        setOutput = setOutput.HConf,
-        getOutput = getOutput.HConf,
-        setName = setName.HConf,
+				setOutput = setOutput.HConf,
+				getOutput = getOutput.HConf,
+				setName = setName.HConf,
 				mrSubmit = mrSubmit.HConf
-				))
-		
+		))
+
 ##################################
 # generic MR job driver          #
 ##################################
@@ -434,81 +435,81 @@ ecor.HConf <- setRefClass("HConf",
 
 #actually create job handle and submit
 initialize.HJob <- function(hconf, overwrite=F ) {
-  
-  if ( length(hconf$mapfun)==0 )
-    stop ("Mapper not specified in configuration.")
-  
-  jfs <- hdfs.dfs()
-  
-  #set up job temporary dir 
-  tstamp<- Sys.time()
-  tstamp <- format(tstamp,"%Y%m%d_%H%M%S")
-  r <- sprintf("%08X",as.integer(runif(1)*(2^32-1)-2^31))
-  tstamp <- sprintf("%s_%s",tstamp,r)
-  
-  tempDir <<- file.path("/temp","R",tstamp)
-  
-  hconf$namespaces <- loadedNamespaces()
-  
-  fcleanup <- character(0)
-  
-  rjobfile <- tempfile()
-  fcleanup<- c(fcleanup, rjobfile)
-  
-  f <- file(rjobfile, open="wb")
-  tryCatch({
-        # my tests seem to indicate 
-        # that this serializes all the function 
-        # environment too.
-        serialize(hconf, f, ascii = F)
-      },
-      finally = close(f)
-  )
-  
-  hconf$set("ecor.hconffile", basename(rjobfile))
-  
-  # map-only?
-  if ( length(hconf$reducefun)==0)
-	  setReduceTasks(0L)
-  
-  #sorry, we have to hijack mapred.child.java.opts here.
-  #  lp <- paste(hconf$javalibpath,collapse = ":")
-  #  hconf$set("mapred.child.java.opts",
-  #      sprintf("%s -Djava.library.path=%s", hconf$memopts, lp))
-
-  jconf <- hconf$as.jconf()
-
-  # not clear if it does any good
-  # explicitly unset any jvm options because it would mask 
-  # the ones set in the backend by default:
-  jconf$set("mapred.child.java.opts", "" )
-  
-  
-  # broadcast tempfile containing environment
-  J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(rjobfile), tempDir, F);
-  
-  jricp <- list.files(system.file("jri",package="rJava"),
-      full.names=T, pattern ="\\.jar$")
-  
-  cp <- c(ecor$cp,jricp)
-
-  J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(cp), tempDir, T);
-  
-  # pre-0.23 way of doing this 
+	
+	if ( length(hconf$mapfun)==0 )
+		stop ("Mapper not specified in configuration.")
+	
+	jfs <- hdfs.dfs()
+	
+	#set up job temporary dir 
+	tstamp<- Sys.time()
+	tstamp <- format(tstamp,"%Y%m%d_%H%M%S")
+	r <- sprintf("%08X",as.integer(runif(1)*(2^32-1)-2^31))
+	tstamp <- sprintf("%s_%s",tstamp,r)
+	
+	tempDir <<- file.path("/temp","R",tstamp)
+	
+	hconf$namespaces <- loadedNamespaces()
+	
+	fcleanup <- character(0)
+	
+	rjobfile <- tempfile()
+	fcleanup<- c(fcleanup, rjobfile)
+	
+	f <- file(rjobfile, open="wb")
+	tryCatch({
+				# my tests seem to indicate 
+				# that this serializes all the function 
+				# environment too.
+				serialize(hconf, f, ascii = F)
+			},
+			finally = close(f)
+	)
+	
+	hconf$set("ecor.hconffile", basename(rjobfile))
+	
+	# map-only?
+	if ( length(hconf$reducefun)==0)
+		setReduceTasks(0L)
+	
+	#sorry, we have to hijack mapred.child.java.opts here.
+	#  lp <- paste(hconf$javalibpath,collapse = ":")
+	#  hconf$set("mapred.child.java.opts",
+	#      sprintf("%s -Djava.library.path=%s", hconf$memopts, lp))
+	
+	jconf <- hconf$as.jconf()
+	
+	# not clear if it does any good
+	# explicitly unset any jvm options because it would mask 
+	# the ones set in the backend by default:
+	jconf$set("mapred.child.java.opts", "" )
+	
+	
+	# broadcast tempfile containing environment
+	J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(rjobfile), tempDir, F);
+	
+	jricp <- list.files(system.file("jri",package="rJava"),
+			full.names=T, pattern ="\\.jar$")
+	
+	cp <- c(ecor$cp,jricp)
+	
+	J("com.inadco.ecoadapters.r.RMRHelper")$addFileToCache(jconf, .jarray(cp), tempDir, T);
+	
+	# pre-0.23 way of doing this 
 #  sapply(cp[!file.info(cp)[,"isdir"]], 
 #      function(f)	J("org.apache.hadoop.filecache.DistributedCache")$
 #        addFileToClassPath(hdfs.path(f), jconf, hdfs.localfs()),
 #      simplify=T)
-  
-  hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
-  
-  if ( overwrite )  
-    hdfs.delete(jfs, hconf$getOutput(), T)
-  
-  hjob$setJobName(hconf$hname)
-  hjob$submit() 
-
-  file.remove(fcleanup[file.exists(fcleanup)])
+	
+	hjob <<- new (J("org.apache.hadoop.mapreduce.Job"),jconf)
+	
+	if ( overwrite )  
+		hdfs.delete(jfs, hconf$getOutput(), T)
+	
+	hjob$setJobName(hconf$hname)
+	hjob$submit() 
+	
+	file.remove(fcleanup[file.exists(fcleanup)])
 }
 
 waitForCompletion.HJob <- function (verbose=F) {
@@ -527,7 +528,7 @@ ecor.HJob <- setRefClass("HJob",
 		methods=list(
 				initialize=initialize.HJob,
 				waitForCompletion=waitForCompletion.HJob
-				)
+		)
 )
 
 ##################################
@@ -551,9 +552,9 @@ ecor.HJob <- setRefClass("HJob",
 	
 	if ( length(ef)==1) {
 		paste( c(as.character(e), 
-					"frame stack: ",
-					names(ef)),
-			collapse = "\n") 
+						"frame stack: ",
+						names(ef)),
+				collapse = "\n") 
 	} else {
 		as.character(e)
 	}
@@ -648,7 +649,7 @@ ecor.HJob <- setRefClass("HJob",
 #' @param key key (will be coerced to a character vector of length 1)
 #' @param value R object to be serialized 
 ecor.collect <- function (key, value) {
-
+	
 	jkey <- as.character(key)
 	if ( length(jkey)!= 1)
 		stop ("must be exactly one character key value")
