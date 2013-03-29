@@ -158,39 +158,28 @@ ecor.hadoopClassPath <- function () {
 
 	if ( nchar(hhome) ==0 )
 		stop ("HADOOP_HOME not set")
-#
-#	hlibdir <- file.path (hhome, "lib")
-#	if ( ! file.exists(hlibdir))
-#		stop ( sprintf("cannot find %s directory.", hlibdir))
-#
-#
-#	hadooplib <- list.files(
-#			hlibdir,
-#			full.names = T,
-#			pattern="\\.jar$")
-#
-#	hadoopcore <- list.files (
-#			hhome,
-#			full.names=T,
-#			pattern=".*core.*\\.jar"
-#	)
-#	# ensure config is loaded form
-#	# the client dir
-#	hadoopconf <- file.path(hhome,"conf")
-#	if ( ! file.exists(hadoopconf) )
-#		stop ("Unable to find hadoop configuration files.")
-#
-#	c(hadooplib, hadoopcore, hadoopconf)
 	
 	# this doesn't quite work yet. switch back to HADOOP_HOME
 	hcp <- unlist(strsplit(system(
 	    paste(file.path(hhome,"bin","hadoop"),"classpath"),intern=T),":|;"))
 	if ( length(hcp) == 0 )
 		stop ("Can't execute \"hadoop classpath\" successfully.");
-
-    hcp
-
+    .expandClassPath(hcp)
 }
+
+.expandClassPath <- function (cp) {
+	# so hadoop in cdh 4 seems to produce trailing * 
+	# instead of concrete jars . So scan for jars ourselves 
+	# as jvm doesn't eat it on its own still.
+	withPatterns <- grep ("\\*",cp)
+	notPatterns <- which(!(1:length(cp))%in%withPatterns)
+	expandedJars <- unlist(sapply(cp[withPatterns], function(pat) {
+				d <- dirname(pat)
+				list.files(d,"*.jar", full.names=T)
+			}))
+	c(cp[notPatterns],expandedJars)
+}
+	
 
 #' Produce local hbase path
 #' 
