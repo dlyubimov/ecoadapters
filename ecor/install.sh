@@ -2,7 +2,7 @@
 # need to have R, rJava  and have a sudo 
 # for this to work. Also have maven executable around
 
-MVN='mvn clean install -DskipTests -DR'
+MVN='mvn -o clean install -DskipTests -DR'
 VER=`mvn help:evaluate -Dexpression=project.version | grep -vi "\\(\\[INFO\\]\\)\\|\\(\\[WARNING\\]\\)"`
 
 PKG="target/ecor-${VER}-rpkg"

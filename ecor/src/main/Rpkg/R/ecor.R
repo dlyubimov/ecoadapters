@@ -165,7 +165,14 @@ ecor.hadoopClassPath <- function () {
 							paste(file.path(hhome,"bin","hadoop"),"classpath"),intern=T),":|;"))
 	if ( length(hcp) == 0 )
 		stop ("Can't execute \"hadoop classpath\" successfully.");
-	.expandClassPath(hcp)
+	
+	ecor.filterSparkClasspathAllergies(.expandClassPath(hcp))
+}
+
+ecor.filterSparkClasspathAllergies <- function(cp) { 
+	# filter out spark allergies 
+	filtered <- c(grep("jetty",cp),grep("netty",cp),grep("test-classes",cp))
+	cp[!(1:length(cp) %in% filtered)]
 }
 
 .expandClassPath <- function (cp) {
