@@ -64,7 +64,6 @@ final class CascadingTupleMap {
     public Message.Builder t2proto(Tuple t, Fields f) throws IOException {
         if (t == null) return null;
         Message.Builder b = this.b.clone();
-        int i = 0;
         for (Descriptors.FieldDescriptor fd : tupleMaps) {
         	int pos = -1;
         	try {
@@ -86,7 +85,6 @@ final class CascadingTupleMap {
 	            }
         	}
 
-            i++;
         }
         return b;
     }

@@ -21,7 +21,6 @@ package com.inadco.ecoadapters.cascading;
 import cascading.flow.FlowProcess;
 import cascading.scheme.SinkCall;
 import cascading.scheme.SourceCall;
-import cascading.scheme.hadoop.SequenceFile;
 import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
@@ -57,7 +56,9 @@ import java.io.IOException;
  */
 public final class ProtoScheme extends SequenceFile {
 
-    private transient Descriptors.Descriptor m_msgDesc;
+    
+	private static final long serialVersionUID = -6464285268036509396L;
+	private transient Descriptors.Descriptor m_msgDesc;
     private transient CascadingTupleMap m_tupleMap;
     private transient Text m_outKey = new Text();
     private String className;
@@ -112,7 +113,8 @@ public final class ProtoScheme extends SequenceFile {
     	}
     }
 
-    @Override
+    @SuppressWarnings("rawtypes")
+	@Override
     public void sourcePrepare(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall) {
         super.sourcePrepare(flowProcess, sourceCall);
         init();
@@ -121,7 +123,8 @@ public final class ProtoScheme extends SequenceFile {
                     "Cascading adapter for protobuff sequence files requires BytesWritable as file value type");
     }
 
-    @Override
+    @SuppressWarnings("rawtypes")
+	@Override
     public void sinkConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         super.sinkConfInit(flowProcess, tap, conf);
         init();
@@ -130,14 +133,15 @@ public final class ProtoScheme extends SequenceFile {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void sinkPrepare(FlowProcess<JobConf> flowProcess, SinkCall<Void, OutputCollector> sinkCall) throws IOException {
         super.sinkPrepare(flowProcess, sinkCall);
         init();
         ((SinkCall) sinkCall).setContext(new BytesWritable());
     }
 
-    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
     public boolean source(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall) throws IOException {
         Writable key = (Writable) sourceCall.getContext()[0];
         BytesWritable bw = (BytesWritable) sourceCall.getContext()[1];
@@ -153,13 +157,13 @@ public final class ProtoScheme extends SequenceFile {
         return true;
     }
 
-    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
     public void sink(FlowProcess<JobConf> flowProcess, SinkCall<Void, OutputCollector> sinkCall) throws IOException {
         Tuple t = sinkCall.getOutgoingEntry().getTuple();
         Fields f = sinkCall.getOutgoingEntry().getFields();
         Message.Builder b = m_tupleMap.t2proto(t,f);
         byte[] msgBytes = b.build().toByteArray();
-        @SuppressWarnings({"unchecked", "rawtypes"})
         BytesWritable val = (BytesWritable) ((SinkCall) sinkCall).getContext();
         val.set(msgBytes, 0, msgBytes.length);
         sinkCall.getOutput().collect(m_outKey, val);
