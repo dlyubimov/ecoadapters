@@ -9,54 +9,53 @@ import org.rosuda.JRI.Rengine;
 import org.testng.annotations.Test;
 
 public class JRITest {
-    
-    public void scratchpad()  {
-        Job j=null;
+
+    public void scratchpad() {
+        Job j = null;
         j.setJobName("a");
-        Configuration conf = null; 
-        
+        Configuration conf = null;
+
     }
-    
-    @Test
-    public static void libpathTest () throws Exception { 
+
+    @Test(enabled = false)
+    public static void libpathTest() throws Exception {
         System.out.println(System.getProperty("java.library.path"));
     }
-    
-    @Test
+
+    @Test(enabled = false)
     public static void jriTest() throws Exception {
-        String[] args = new String[] { "--vanilla" };
-        
+        String[] args = new String[]{"--vanilla"};
+
         Rengine engine = new Rengine(args, false, null);
-        REXP r ;
-        
-        r= engine.eval("library(ecor)");
+        REXP r;
+
+        r = engine.eval("library(ecor)");
         System.out.println(r.toString());
-        
+
         r = engine.eval("stop('R error.')");
-        
-        r=engine.eval("T");
-        System.out.println(r.getType()==REXP.XT_ARRAY_BOOL_INT);
-        
-        r=engine.eval("'abc'");
-        System.out.println(""+r.getType()+ (r.getType()==REXP.XT_STR));
-        
-        r=engine.eval("list(a=list(\"B\",\"D\", list(sublist=\"s\")))");
-        System.out.println(""+r.getType()+ (r.getType()==REXP.XT_VECTOR));
-        
+
+        r = engine.eval("T");
+        System.out.println(r.getType() == REXP.XT_ARRAY_BOOL_INT);
+
+        r = engine.eval("'abc'");
+        System.out.println("" + r.getType() + (r.getType() == REXP.XT_STR));
+
+        r = engine.eval("list(a=list(\"B\",\"D\", list(sublist=\"s\")))");
+        System.out.println("" + r.getType() + (r.getType() == REXP.XT_VECTOR));
+
         RList rlist = r.asList();
         REXP axp = rlist.at("a");
         RList al = axp.asList();
         RVector av = axp.asVector();
 
-        if ( al != null ) 
+        if (al != null)
             System.out.printf("%s\n",/*al.keys().length,*/al.at(0));
-        if ( av != null ) 
-            System.out.printf("%d,%s\n", av.size(), av.at(0) );
+        if (av != null)
+            System.out.printf("%d,%s\n", av.size(), av.at(0));
 
-        
-        
+
 //        System.out.printf("%s,%s\n", r.toString(), r.);
-        
+
         engine.end();
 
     }
