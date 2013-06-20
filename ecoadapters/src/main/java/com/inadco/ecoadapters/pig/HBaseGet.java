@@ -19,6 +19,7 @@
 package com.inadco.ecoadapters.pig;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 
@@ -90,6 +91,10 @@ public class HBaseGet extends EvalFunc<Tuple> {
         try {
 
             // validate input
+
+            List<FieldSchema> fields = input.getFields();
+            if ( fields.size() == 0 )
+                throw new IllegalArgumentException("HBaseGet() call requires at least one argument");
 
             // generate output schema.
             for (int i = 0; i < m_colSpec.m_pigSchema.length; i++) {

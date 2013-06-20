@@ -97,6 +97,7 @@ public class Proto2Pig extends EvalFunc<Tuple> {
         if (tuple == null)
             return null;
         DataByteArray serMsg = (DataByteArray) tuple.get(0);
+        if (serMsg == null ) return null;
         Message msg = msgBuilder.clone().mergeFrom(serMsg.get(), 0, serMsg.size()).buildPartial();
         return PigUtil.protoMessage2PigTuple(msg, msgDesc, tupleFactory);
     }
