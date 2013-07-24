@@ -81,18 +81,18 @@
 
   <properties>
     <!--CDH4 -->
-    <hadoop.version>2.0.0-cdh4.1.2</hadoop.version>
+    <hadoop.version>2.0.0-cdh4.3.1</hadoop.version>
 
     <!-- out-of-cdh version, unfortunately doesn't have dependencyManagementn
       defined to re-import all versions -->
-    <hbase.version>0.92.1-cdh4.1.2</hbase.version>
-    <zookeeper.version>3.4.3-cdh4.1.2</zookeeper.version>
+    <hbase.version>0.94.6-cdh4.3.0</hbase.version>
+    <zookeeper.version>3.4.5-cdh4.3.0</zookeeper.version>
 
     <protobuf.version>2.4.1</protobuf.version>
     <!-- for tests, 3rd party protobuf serialization into json, xml -->
     <protobuf-java-format.version>1.2</protobuf-java-format.version>
-    <hive.version>0.9.0-cdh4.1.2</hive.version>
-    <pig.version>0.10.0-cdh4.1.2</pig.version>
+    <hive.version>0.10.0-cdh4.3.0</hive.version>
+    <pig.version>0.11.0-cdh4.3.0</pig.version>
     <log4j.version>1.2.17</log4j.version>
     <spring.version>3.0.5.RELEASE</spring.version>
 
