@@ -21,7 +21,6 @@ import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-
 /**
  * A pig StoreFunc to store HBase hFiles
  * 
@@ -47,15 +46,14 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
  *
  */
 @SuppressWarnings("rawtypes")
-public class HBaseBulkProtobufStorage extends StoreFunc {
-
+public class HFileStorage extends StoreFunc {
 
 	protected RecordWriter writer = null;
 	private Map<String,Integer> familyQualToIndex;
 	private String[] qualifiers;
 	private String[] families;
 
-	public HBaseBulkProtobufStorage(String storageSpec) {
+	public HFileStorage(String storageSpec) {
 		String[] storage = storageSpec.split("\\s");
 
 		familyQualToIndex = new HashMap<String,Integer>();
