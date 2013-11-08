@@ -113,13 +113,15 @@ public class HFileStorage extends StoreFunc {
 
 			KeyValue kv;
 			for(int i = 0;i<qualifiers.length;i++) {
-				kv = new KeyValue(getValue(t.get(0)),families[i].getBytes(),qualifiers[i].getBytes(),getValue(t.get(i+1)));
+        Object v = t.get(i+1);
+        if ( v == null ) continue;
+				kv = new KeyValue(getValue(t.get(0)),families[i].getBytes(),qualifiers[i].getBytes(),getValue(v));
 				arr[familyQualToIndex.get((new String(kv.getFamily()))+":"+(new String(kv.getQualifier()))).intValue()] = kv;
 			}
 
 			// Ordered write
 			for (KeyValue kv2 : arr) {
-				writer.write(hbaseRowKey, kv2);
+				if (kv2 != null ) writer.write(hbaseRowKey, kv2);
 			}
 		} catch(Exception e) {
 			e.printStackTrace();
