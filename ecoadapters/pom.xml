@@ -116,6 +116,11 @@
       <artifactId>hive-serde</artifactId>
       <optional>true</optional>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <optional>true</optional>
+    </dependency>
 
     <!-- spring -->
     <dependency>

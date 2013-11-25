@@ -18,22 +18,26 @@
  */
 package com.inadco.ecoadapters.hive;
 
+
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.log4j.Logger;
+
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
@@ -52,7 +56,7 @@ import com.inadco.ecoadapters.EcoUtil;
  * CREATE EXTERNAL TABLE IMPRESSION_LOGS 
  * ROW FORMAT SERDE 'com.inadco.ecoadapters.hive.ProtoSerDe'
  * WITH SERDEPROPERTIES ("messageClass"="com.inadco.logging.codegen.test.TestMessages$TestLogProto")
- * STORED AS SEQUENCEFILE
+ * STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.SequenceFileInputFormat' OUTPUTFORMAT 'com.inadco.ecoadapters.hive.SequenceFileOutputFormat'
  * LOCATION '/data/inadco/var/log/IMPRESSION'
  * 
  * Found class for com.inadco.ecoadapters.hive.ProtobufSerDe
@@ -75,7 +79,7 @@ import com.inadco.ecoadapters.EcoUtil;
  * CREATE EXTERNAL TABLE IMPRESSION_LOGS 
  * ROW FORMAT SERDE 'com.inadco.ecoadapters.hive.ProtoSerDe'
  * WITH SERDEPROPERTIES ("fileDescSetUri"="hdfs://localhost:11010/data/inadco/protolib/testMessages.protodesc?msg=inadco.test.TestLogProto")
- * STORED AS SEQUENCEFILE
+ * STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.SequenceFileInputFormat' OUTPUTFORMAT 'com.inadco.ecoadapters.hive.SequenceFileOutputFormat'
  * LOCATION '/data/inadco/var/log/IMPRESSION'
  * 
  * </pre>
@@ -120,6 +124,8 @@ public class ProtoSerDe implements SerDe {
     private StructObjectInspector m_protoMsgInspector;
     private Descriptors.Descriptor m_msgDesc;
     private Message.Builder m_msgBuilder;
+    private Map<String,Map<Integer,FieldDescriptor>> m_desc = new HashMap<String,Map<Integer,FieldDescriptor>>();
+    
 
     public ProtoSerDe() {
         super();
@@ -187,12 +193,55 @@ public class ProtoSerDe implements SerDe {
             return toError(thr);
         }
     }
+    
+    private Message.Builder hive2protomsg(List<Object> input, Message.Builder builder, Descriptors.Descriptor desc, ObjectInspector soi) throws SerDeException {
+    	Map<Integer,FieldDescriptor> idToField = m_desc.get(desc.getFullName());
+    	
+    	if(idToField == null) {
+    		idToField = new HashMap<Integer,FieldDescriptor>();
+    		for(FieldDescriptor f : desc.getFields()) {
+        		idToField.put(new Integer(f.getIndex()), f);
+        	}
+    		m_desc.put(desc.getFullName(), idToField);
+    	}
+    	
+    	int i=0;
+    	for(Object field : input) {
+    		FieldDescriptor pField = idToField.get(new Integer(i));
+    		if(field != null && pField != null) {
+    			if(pField.isRepeated()) {
+    				if(pField.getType() == FieldDescriptor.Type.MESSAGE) {
+    					ListObjectInspector sloi = (ListObjectInspector)((StructObjectInspector)soi).getAllStructFieldRefs().get(i).getFieldObjectInspector();
+    					
+    					for(Object o : sloi.getList(field)) {
+    						StructObjectInspector s_oi = (StructObjectInspector)sloi.getListElementObjectInspector();
+    						List<Object> list = s_oi.getStructFieldsDataAsList(o);
+    						Message.Builder b = hive2protomsg(list,DynamicMessage.newBuilder(pField.getMessageType()), pField.getMessageType(), s_oi);
+    						builder.addRepeatedField(pField, b.build());
+    					}
+    				} else {
+    					ListObjectInspector sloi = (ListObjectInspector)((StructObjectInspector)soi).getAllStructFieldRefs().get(i).getFieldObjectInspector();
+    					for(Object o : sloi.getList(field)) {
+    						builder.addRepeatedField(pField, hive2proto(o,pField, sloi.getListElementObjectInspector()));
+    					}
+    				}
+    			} else {
+    				builder.setField(pField, hive2proto(field,pField, soi));
+    			}
+    		}
+    		i++;
+    	}
+    	return builder;
+    }
 
     @Override
     public Writable serialize(Object src, ObjectInspector oi)
             throws SerDeException {
-        throw new SerDeException(
-                "serialization into a protobuf object not yet supported");
+    	
+    	StructObjectInspector soi = (StructObjectInspector)oi;
+    	List<Object> list = soi.getStructFieldsDataAsList(src);
+    	Message.Builder b = hive2protomsg(list, m_msgBuilder.clone(), m_msgDesc, soi);
+    	return new BytesWritable(b.build().toByteArray());
     }
 
     private static List<Object> protoMsg2Hive(Message msg,
@@ -262,6 +311,56 @@ public class ProtoSerDe implements SerDe {
 
         }
     }
+    
+    @SuppressWarnings("unchecked")
+	private Object hive2proto(Object src, FieldDescriptor fd, ObjectInspector soi) throws SerDeException {
+
+    	// TODO: lots of parsing overhead here, not sure if TINYINT is Integer in intermediate steps, or still just byte[]
+    	Object obj = null;
+        switch (fd.getType()) {
+            case BOOL:
+                if(src instanceof Boolean) { obj = src; } else { obj = Boolean.parseBoolean(""+src); }
+                break;
+            case BYTES:
+                obj = getByteArray(src+"");
+                break;
+            case DOUBLE:
+            	if(src instanceof Double) { obj = src; } else { obj = Double.parseDouble(""+src); }
+                break;
+            case SINT32:
+            case SFIXED32:
+            case UINT32:
+            case INT32:
+            case FIXED32:
+            	if(src instanceof Integer) { obj = src; } else { obj = Integer.parseInt(""+src); }
+            	break;
+
+            case SINT64:
+            case SFIXED64:
+            case INT64:
+            case UINT64:
+            case FIXED64:
+            	if(src instanceof Long) { obj = src; } else { obj = Long.parseLong(""+src); }
+            	break;
+
+            case FLOAT:
+            	if(src instanceof Float) { obj = src; } else { obj = Float.parseFloat(""+src); }
+                break;
+            case STRING:
+                obj = ""+src;
+                break;
+            case ENUM:
+                obj = fd.getEnumType().findValueByName(""+src);
+                break;
+            case MESSAGE:
+            	ListObjectInspector sloi = (ListObjectInspector)soi;
+            	obj = hive2protomsg((List<Object>) sloi.getList(src),DynamicMessage.newBuilder(fd.getMessageType()), fd.getMessageType(), soi).build();
+            	break;
+            default:
+                throw new SerDeException("Unsupported proto data type in the protodesc.");
+        }
+        return obj;
+    }
 
     private List<Object> toError(Throwable thr) {
 
@@ -284,13 +383,13 @@ public class ProtoSerDe implements SerDe {
         }
         return result.toString().toUpperCase();
     }
+    
+    private static byte[] getByteArray(String s) {
+    	return new BigInteger(s, 16).toByteArray();
+    }
 
 	@Override
 	public SerDeStats getSerDeStats() {
-		// TODO Auto-generated method stub
-		//		return null;
-		throw new NotImplementedException();
-		
+		return null;
 	}
-
 }
