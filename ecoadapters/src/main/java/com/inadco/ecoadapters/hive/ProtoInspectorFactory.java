@@ -19,7 +19,9 @@
 package com.inadco.ecoadapters.hive;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -38,6 +40,8 @@ import com.google.protobuf.Descriptors.FieldDescriptor;
  */
 class ProtoInspectorFactory {
 
+    private static Integer maxRecursionDepth = 1;
+
     /**
      * Create Hive inspector for a protobuf message
      * 
@@ -47,13 +51,14 @@ class ProtoInspectorFactory {
      */
     public static StructObjectInspector createProtobufInspector(
             Descriptors.Descriptor desc) {
+        Map<String, Integer> seenMap = new HashMap<String, Integer>();
         List<String> names = new ArrayList<String>();
         List<ObjectInspector> inspectors = new ArrayList<ObjectInspector>();
 
         for (FieldDescriptor fd : desc.getFields()) {
             String name = fd.getName();
             names.add(name);
-            ObjectInspector inspector = createInspector(fd);
+            ObjectInspector inspector = createInspector(fd, null, "", false, seenMap);
             inspectors.add(inspector);
         }
 
@@ -65,15 +70,79 @@ class ProtoInspectorFactory {
                 inspectors);
     }
 
-    private static ObjectInspector createInspector(FieldDescriptor fd) {
+    /**
+     * Create Hive inspector for a protobuf message
+     *
+     * @param outerDesc
+     *            Protobuf message descriptor
+     * @param innerDesc
+     *            Protobuf message descriptor for a protobuf implicitly contained in outerDesc
+     * @param connectingField
+     *            The field name that contains the reference to innerDesc
+     * @param addError
+     *            Add an error field to the struct.
+     * @param seenMap
+     *            Map of all seen field names, helps avoid recursions in protobuf definitions
+     * @return Hive structure object inspector
+     */
+    public static StructObjectInspector createProtobufInspector(
+            Descriptors.Descriptor outerDesc,
+            Descriptors.Descriptor innerDesc,
+            String connectingField,
+            boolean addError,
+            Map<String, Integer> seenMap) {
+        List<String> names = new ArrayList<String>();
+        List<ObjectInspector> inspectors = new ArrayList<ObjectInspector>();
+
+        for (FieldDescriptor fd : outerDesc.getFields()) {
+          String name = fd.getName();
+          Integer occurances = seenMap.containsKey(name) ? seenMap.get(name) : 0;
+          if (occurances < maxRecursionDepth) {
+
+            Integer count = seenMap.containsKey(name) ? seenMap.get(name) : 0;
+            seenMap.put(name, count + 1);
+
+            names.add(name);
+            ObjectInspector inspector = createInspector(fd, innerDesc, connectingField, addError, seenMap);
+            inspectors.add(inspector);
+
+            seenMap.put(name, seenMap.get(name) - 1);
+          }
+        }
+
+        if (addError) {
+            names.add("___ERROR___");
+            inspectors
+                    .add(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
+        }
+
+        return ObjectInspectorFactory.getStandardStructObjectInspector(names,
+                inspectors);
+    }
+
+    private static ObjectInspector createInspector(FieldDescriptor fd,
+                                                   Descriptors.Descriptor innerDesc,
+                                                   String connectingField,
+                                                   boolean addError,
+                                                   Map<String, Integer> seenMap) {
         if (fd.isRepeated())
-            return createListInspector(fd);
+            return createListInspector(fd, innerDesc, connectingField, addError, seenMap);
         else
-            return createNonRepeatedInspector(fd);
+            return createNonRepeatedInspector(fd, innerDesc, connectingField, addError, seenMap);
     }
 
     private static ObjectInspector createNonRepeatedInspector(
-            FieldDescriptor fd) {
+            FieldDescriptor fd,
+            Descriptors.Descriptor innerDesc,
+            String connectingField,
+            boolean addError,
+            Map<String, Integer> seenMap) {
+
+
+        if (innerDesc != null && fd.getName().equals(connectingField)) {
+          return createProtobufInspector(innerDesc, null, connectingField, addError, seenMap);
+        }
+
         switch (fd.getType()) {
         case BOOL:
             return PrimitiveObjectInspectorFactory.javaBooleanObjectInspector;
@@ -97,7 +166,7 @@ class ProtoInspectorFactory {
         case FLOAT:
             return PrimitiveObjectInspectorFactory.javaFloatObjectInspector;
         case MESSAGE:
-            return createProtobufInspector(fd.getMessageType());
+            return createProtobufInspector(fd.getMessageType(), innerDesc, connectingField, addError, seenMap);
         case STRING:
             return PrimitiveObjectInspectorFactory.javaStringObjectInspector;
 
@@ -111,9 +180,13 @@ class ProtoInspectorFactory {
         }
     }
 
-    private static ObjectInspector createListInspector(FieldDescriptor fd) {
+    private static ObjectInspector createListInspector(FieldDescriptor fd,
+                                                       Descriptors.Descriptor innerDesc,
+                                                       String connectingField,
+                                                       boolean addError,
+                                                       Map<String, Integer> seenMap) {
         return ObjectInspectorFactory
-                .getStandardListObjectInspector(createNonRepeatedInspector(fd));
+                .getStandardListObjectInspector(createNonRepeatedInspector(fd, innerDesc, connectingField, addError, seenMap));
     }
 
 }
